@@ -1,4 +1,4 @@
-# ProxyTool 使用文档
+# Gate 使用文档
 
 ## 1. 安装与部署
 
@@ -8,10 +8,10 @@
 
 ```
 publish/
-├── proxy-tool-win-x64/        # Windows 自包含 CLI
-├── proxy-tool-win-x64-fd/      # Windows 框架依赖 CLI（需安装 .NET 8）
-├── proxy-tool-linux-x64/
-├── proxy-tool-api-win-x64/    # API 服务
+├── gate-win-x64/        # Windows 自包含 CLI
+├── gate-win-x64-fd/     # Windows 框架依赖 CLI（需安装 .NET 8）
+├── gate-linux-x64/
+├── gate-osx-x64/
 └── ...
 ```
 
@@ -20,38 +20,23 @@ publish/
 **Windows**：
 ```powershell
 # 自包含版本（推荐，无需安装 .NET）
-.\proxy-tool.exe --help
+.\gate.exe --help
 
 # 框架依赖版本（需已安装 .NET 8 SDK/Runtime）
-dotnet proxy-tool.dll --help
+dotnet gate.dll --help
 ```
 
 **Linux/macOS**：
 ```bash
 # 自包含版本
-./proxy-tool --help
+./gate --help
 
 # 或添加执行权限
-chmod +x proxy-tool
-./proxy-tool --help
+chmod +x gate
+./gate --help
 ```
 
-### 1.3 运行 API 服务
-
-```bash
-# Windows
-.\ProxyTool.API.exe
-
-# Linux/macOS
-./ProxyTool.API
-
-# 或使用 dotnet（框架依赖版本）
-dotnet ProxyTool.API.dll
-```
-
-默认监听 `http://localhost:5000`，开发环境下可访问 `http://localhost:5000/swagger` 查看 API 文档。
-
----
+> 说明：原 API 服务 (`ProxyTool.API`) 已从当前项目中移除，Gate 现仅提供 CLI 工具。
 
 ## 2. CLI 命令详解
 
@@ -62,27 +47,27 @@ dotnet ProxyTool.API.dll
 #### 设置代理
 ```bash
 # 基本用法
-proxy-tool env --http http://proxy.example.com:8080
+gate env --http http://proxy.example.com:8080
 
 # 分别指定 HTTP 和 HTTPS
-proxy-tool env --http http://proxy.example.com:8080 --https https://proxy.example.com:8080
+gate env --http http://proxy.example.com:8080 --https https://proxy.example.com:8080
 
 # 设置排除列表（不走代理的地址）
-proxy-tool env --http http://proxy.example.com:8080 --no-proxy "localhost,127.0.0.1,.internal"
+gate env --http http://proxy.example.com:8080 --no-proxy "localhost,127.0.0.1,.internal"
 
 # 设置前验证代理连通性
-proxy-tool env --http http://proxy.example.com:8080 --verify
+gate env --http http://proxy.example.com:8080 --verify
 ```
 
 #### 清除代理
 ```bash
-proxy-tool env --clear
+gate env --clear
 ```
 
 #### 查看当前配置
 ```bash
 # 不传参数时显示当前用户级环境变量
-proxy-tool env
+gate env
 ```
 
 **输出示例**：
@@ -101,7 +86,7 @@ proxy-tool env
 
 #### 列出所有支持的工具
 ```bash
-proxy-tool tool --list
+gate tool --list
 ```
 
 **输出示例**：
@@ -120,20 +105,20 @@ proxy-tool tool --list
 
 #### 为工具设置代理
 ```bash
-proxy-tool tool --name npm --proxy http://proxy.example.com:8080
-proxy-tool tool --name git --proxy http://proxy.example.com:8080
-proxy-tool tool --name docker --proxy http://proxy.example.com:8080
+gate tool --name npm --proxy http://proxy.example.com:8080
+gate tool --name git --proxy http://proxy.example.com:8080
+gate tool --name docker --proxy http://proxy.example.com:8080
 ```
 
 #### 清除工具代理
 ```bash
-proxy-tool tool --name npm --clear
-proxy-tool tool --name git --clear
+gate tool --name npm --clear
+gate tool --name git --clear
 ```
 
 #### 查看工具当前配置
 ```bash
-proxy-tool tool --name npm
+gate tool --name npm
 # 输出: npm 当前代理: HTTP=http://proxy.example.com:8080
 ```
 
@@ -149,9 +134,9 @@ proxy-tool tool --name npm
 
 #### 列出配置集
 ```bash
-proxy-tool profile --list
+gate profile --list
 # 或不传参数
-proxy-tool profile
+gate profile
 ```
 
 **输出示例**：
@@ -169,24 +154,24 @@ proxy-tool profile
 # 先设置好环境变量和各工具代理，再保存
 proxy-tool env --http http://company-proxy:8080
 proxy-tool tool --name npm --proxy http://company-proxy:8080
-proxy-tool profile --name company --save
+gate profile --name company --save
 ```
 
 #### 加载配置集
 ```bash
-proxy-tool profile --name company --load
+gate profile --name company --load
 ```
 
 加载后会将配置集内的环境变量应用到当前进程。
 
 #### 删除配置集
 ```bash
-proxy-tool profile --name old-profile --delete
+gate profile --name old-profile --delete
 ```
 
 #### 设置默认配置集
 ```bash
-proxy-tool profile --name company --set-default
+gate profile --name company --set-default
 ```
 
 ---
@@ -197,18 +182,18 @@ proxy-tool profile --name company --set-default
 
 #### 测试指定代理
 ```bash
-proxy-tool test --proxy http://proxy.example.com:8080
+gate test --proxy http://proxy.example.com:8080
 ```
 
 #### 测试当前环境变量中的代理
 ```bash
 # 不指定 --proxy 时使用 HTTP_PROXY 或 HTTPS_PROXY
-proxy-tool test
+gate test
 ```
 
 #### 指定测试 URL
 ```bash
-proxy-tool test --proxy http://proxy.example.com:8080 --url https://www.google.com
+gate test --proxy http://proxy.example.com:8080 --url https://www.google.com
 ```
 
 **输出示例**：
@@ -230,36 +215,36 @@ proxy-tool test --proxy http://proxy.example.com:8080 --url https://www.google.c
 
 ```bash
 # 1. 设置环境变量（当前终端生效）
-proxy-tool env --http http://proxy.company.com:8080 --verify
+gate env --http http://proxy.company.com:8080 --verify
 
 # 2. 为常用工具设置代理
-proxy-tool tool --name npm --proxy http://proxy.company.com:8080
-proxy-tool tool --name git --proxy http://proxy.company.com:8080
-proxy-tool tool --name go --proxy http://proxy.company.com:8080
+gate tool --name npm --proxy http://proxy.company.com:8080
+gate tool --name git --proxy http://proxy.company.com:8080
+gate tool --name go --proxy http://proxy.company.com:8080
 
 # 3. 保存为配置集，下次一键加载
-proxy-tool profile --name company --save
+gate profile --name company --save
 ```
 
 ### 3.2 场景二：切换不同代理
 
 ```bash
 # 加载公司配置
-proxy-tool profile --name company --load
+gate profile --name company --load
 
 # 切换到家庭/直连（清除代理）
-proxy-tool env --clear
-proxy-tool tool --name npm --clear
-proxy-tool tool --name git --clear
+gate env --clear
+gate tool --name npm --clear
+gate tool --name git --clear
 ```
 
 ### 3.3 场景三：AI 开发工具代理
 
 ```bash
 # 为 Cursor、Ollama、OpenAI 等设置代理
-proxy-tool tool --name cursor --proxy http://proxy.example.com:8080
-proxy-tool tool --name ollama --proxy http://proxy.example.com:8080
-proxy-tool tool --name openai --proxy http://proxy.example.com:8080
+gate tool --name cursor --proxy http://proxy.example.com:8080
+gate tool --name ollama --proxy http://proxy.example.com:8080
+gate tool --name openai --proxy http://proxy.example.com:8080
 ```
 
 ### 3.4 场景四：批量配置
@@ -307,16 +292,16 @@ curl -X POST http://localhost:5000/api/v1/proxy/test \
 ### 5.1 使用 build.ps1（Windows）
 
 ```powershell
-# 完整打包（自包含，win/linux/osx）
+# 完整打包（自包含，win/linux/osx，仅 CLI；Core 作为依赖随 CLI 输出）
 .\build.ps1
 
 # 框架依赖版本（体积更小，需目标机器有 .NET）
 .\build.ps1 -fd
 
-# 仅打包 CLI，指定运行时
-.\build.ps1 -Runtimes "win-x64" -Projects "cli"
+# 指定运行时
+.\build.ps1 -Runtimes "win-x64"
 
-# 指定版本号
+# 指定版本号（仅用于脚本标题显示；压缩包版本见 package.ps1）
 .\build.ps1 -Version "1.1.0"
 ```
 
@@ -329,13 +314,11 @@ chmod +x build.sh
 # 框架依赖
 ./build.sh --fd
 
-# 仅 CLI
-./build.sh --cli-only
+# 指定运行时
+./build.sh --runtimes "linux-x64,osx-x64"
 ```
 
-输出目录为 `publish/`，不生成压缩包。
-
----
+输出目录为 `publish/gate-{rid}/`，不生成压缩包。
 
 ## 6. 常见问题
 
