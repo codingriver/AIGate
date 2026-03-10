@@ -101,3 +101,4 @@ wrangler.dev.toml
 db.sqlite
 /publish
 /releases
+bin
