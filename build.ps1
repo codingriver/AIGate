@@ -33,6 +33,15 @@
 param(
     [switch]$fd,
     [string]$Runtimes = "win-x64,linux-x64,osx-x64",
+    [string]$Version = "1.0.0",
+    [string]$UnityPkgPath = "D:\UniToolGUI\UnityPackage\Gate"
+)
+    [switch]$fd,
+    [string]$Runtimes = "win-x64,linux-x64,osx-x64",
+    [string]$Version = "1.0.0",
+    [string]$UnityPkgPath = "D:\UniToolGUI\UnityPackage\Gate"
+    [switch]$fd,
+    [string]$Runtimes = "win-x64,linux-x64,osx-x64",
     [string]$Version = "1.0.0"
 )
 
@@ -73,11 +82,30 @@ Write-Host "[1/4] Restoring NuGet packages..." -ForegroundColor Yellow
 dotnet restore $SlnPath -clp:ErrorsOnly
 if ($LASTEXITCODE -ne 0) { exit 1 }
 
-# 2. Build
-Write-Host "[2/4] Building..." -ForegroundColor Yellow
+# 2. Build Core and CLI
+Write-Host "[2/4] Building Core and CLI..." -ForegroundColor Yellow
 dotnet build $SlnPath -c Release --no-restore -clp:ErrorsOnly
 if ($LASTEXITCODE -ne 0) { exit 1 }
 
+# 2.5 Copy Core DLL to Unity
+Write-Host "[2.5/4] Copying Core DLL to Unity..." -ForegroundColor Yellow
+$CoreProject = Join-Path $SrcDir "Gate.Core\Gate.Core.csproj"
+$CoreBinPath = Join-Path (Split-Path $CoreProject) "bin\Release\netstandard2.0\Gate.Core.dll"
+if (Test-Path $CoreBinPath) {
+    if (-not (Test-Path $UnityPkgPath)) {
+        New-Item -ItemType Directory -Force -Path $UnityPkgPath | Out-Null
+    }
+    Copy-Item $CoreBinPath -Destination (Join-Path $UnityPkgPath "Gate.Core.dll") -Force
+    Write-Host "  Copied Gate.Core.dll to: $UnityPkgPath" -ForegroundColor Green
+} else {
+    Write-Host "  Warning: Gate.Core.dll not found at $CoreBinPath" -ForegroundColor Yellow
+}
+
+
+Write-Host "[2/4] Building..." -ForegroundColor Yellow
+dotnet build $SlnPath -c Release --no-restore -clp:ErrorsOnly
+if ($LASTEXITCODE -ne 0) { exit 1 }
+# 3. Publish CLI per RID
 # 3. Publish CLI per RID
 Write-Host "[3/4] Publishing CLI..." -ForegroundColor Yellow
 New-Item -ItemType Directory -Force -Path $PublishDir | Out-Null

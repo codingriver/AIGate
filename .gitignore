@@ -102,3 +102,7 @@ db.sqlite
 /publish
 /releases
 bin
+obj
+*.dll
+*.pdb
+*.png
