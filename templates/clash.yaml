@@ -1,0 +1,33 @@
+# Clash 代理配置模板
+# 适用于 Clash、ClashX、Clash for Windows 等客户端
+
+name: clash
+description: Clash 代理客户端配置
+category: 代理服务
+
+envVars:
+  http_proxy: http://127.0.0.1:7890
+  https_proxy: http://127.0.0.1:7890
+  no_proxy: localhost,127.0.0.1,.local
+
+tools:
+  git:
+    http.proxy: http://127.0.0.1:7890
+    https.proxy: http://127.0.0.1:7890
+  
+  npm:
+    proxy: http://127.0.0.1:7890
+    https-proxy: http://127.0.0.1:7890
+  
+  pip:
+    proxy: http://127.0.0.1:7890
+
+# Clash 端口说明
+# HTTP: 7890
+# SOCKS5: 7891
+# 开启代理局域网: 7892
+# 控制面板: http://clash.razord.top (仅本地)
+
+version: "1.0.0"
+tags: ["Clash", "代理", "Surge"]
+author: ProxyTool

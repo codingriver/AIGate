@@ -1,0 +1,29 @@
+{
+  "id": "example-tool-configurator",
+  "name": "Example Tool Configurator",
+  "description": "示例工具配置器插件 - 展示如何创建自定义工具代理配置",
+  "version": "1.0.0",
+  "author": "Your Name",
+  "type": "ToolConfigurator",
+  "tags": ["example", "template", "tutorial"],
+  
+  "entryPoint": "ExampleToolConfigurator",
+  "dllPath": "./plugins/ExampleTool.dll",
+  
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "toolName": { "type": "string" },
+      "configPath": { "type": "string" },
+      "proxyPattern": { "type": "string" }
+    }
+  },
+  
+  "dependencies": [],
+  
+  "settings": {
+    "toolName": "example",
+    "configPath": "~/.examplerc",
+    "proxyPattern": "proxy = {proxy}"
+  }
+}

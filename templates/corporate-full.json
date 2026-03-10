@@ -1,0 +1,32 @@
+{
+  "name": "corporate-full",
+  "description": "企业完整网络代理配置 - 包含所有常用工具",
+  "category": "企业",
+  "envVars": {
+    "http_proxy": "http://proxy.company.com:8080",
+    "https_proxy": "http://proxy.company.com:8080",
+    "no_proxy": "localhost,127.0.0.1,.company.com,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+  },
+  "tools": {
+    "git": {
+      "http.proxy": "http://proxy.company.com:8080",
+      "https.proxy": "http://proxy.company.com:8080"
+    },
+    "npm": {
+      "proxy": "http://proxy.company.com:8080",
+      "https-proxy": "http://proxy.company.com:8080"
+    },
+    "pip": {
+      "proxy": "http://proxy.company.com:8080"
+    },
+    "docker": {
+      "proxies": {
+        "httpProxy": "http://proxy.company.com:8080",
+        "httpsProxy": "http://proxy.company.com:8080"
+      }
+    }
+  },
+  "version": "1.0.0",
+  "author": "ProxyTool",
+  "tags": ["企业", "公司", "完整配置"]
+}

@@ -1,0 +1,10 @@
+D:\AIGate\src\ProxyTool.Core\bin\Debug\netstandard2.0\ProxyTool.Core.deps.json
+D:\AIGate\src\ProxyTool.Core\bin\Debug\netstandard2.0\ProxyTool.Core.dll
+D:\AIGate\src\ProxyTool.Core\bin\Debug\netstandard2.0\ProxyTool.Core.pdb
+D:\AIGate\src\ProxyTool.Core\obj\Debug\netstandard2.0\ProxyTool.Core.csproj.AssemblyReference.cache
+D:\AIGate\src\ProxyTool.Core\obj\Debug\netstandard2.0\ProxyTool.Core.GeneratedMSBuildEditorConfig.editorconfig
+D:\AIGate\src\ProxyTool.Core\obj\Debug\netstandard2.0\ProxyTool.Core.AssemblyInfoInputs.cache
+D:\AIGate\src\ProxyTool.Core\obj\Debug\netstandard2.0\ProxyTool.Core.AssemblyInfo.cs
+D:\AIGate\src\ProxyTool.Core\obj\Debug\netstandard2.0\ProxyTool.Core.csproj.CoreCompileInputs.cache
+D:\AIGate\src\ProxyTool.Core\obj\Debug\netstandard2.0\ProxyTool.Core.dll
+D:\AIGate\src\ProxyTool.Core\obj\Debug\netstandard2.0\ProxyTool.Core.pdb
