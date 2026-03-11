@@ -106,3 +106,4 @@ obj
 *.dll
 *.pdb
 *.png
+/tex
