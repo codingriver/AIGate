@@ -364,7 +364,57 @@ listCommand.SetHandler((string? resource) =>
 }, listArg);
 rootCommand.AddCommand(listCommand);
 
-// ── 9. wizard ─────────────────────────────────────────────────────────────────
+// ── 9. path ─────────────────────────────────────────────────────────────────
+var pathCommand = new Command("path", "查看或设置工具的自定义路径（解决非标准安装路径问题）");
+var pathName   = new Option<string?>(new[]{"--name","-n"}, "工具名称");
+var pathExec   = new Option<string?>("--exec",  "可执行文件路径");
+var pathCfg    = new Option<string?>("--config","配置文件路径");
+var pathClear  = new Option<bool>(   "--clear", "清除自定义路径，恢复自动检测");
+var pathList   = new Option<bool>(   new[]{"--list","-l"}, "列出所有已自定义路径的工具");
+pathCommand.AddOption(pathName); pathCommand.AddOption(pathExec);
+pathCommand.AddOption(pathCfg);  pathCommand.AddOption(pathClear);
+pathCommand.AddOption(pathList);
+
+// Path config stored at: ~/.gate/tool_paths.json
+var toolPathFile = Path.Combine(
+    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+    ".gate", "tool_paths.json");
+
+pathCommand.SetHandler((string? name, string? exec, string? cfg, bool clear, bool list) =>
+{
+    if (list)
+    {
+        ConsoleStyle.Title("已自定义路径的工具");
+        if (!File.Exists(toolPathFile)) { ConsoleStyle.Info("  暂无自定义路径配置。"); return; }
+        var json = File.ReadAllText(toolPathFile);
+        Console.WriteLine(json);
+        return;
+    }
+    if (string.IsNullOrEmpty(name)) { ConsoleStyle.Warning("请使用 --name/-n 指定工具名。"); return; }
+    var tool = ToolRegistry.GetByName(name);
+    if (tool == null) { ConsoleStyle.Error($"未找到工具: {name}"); return; }
+    if (clear)
+    {
+        // Remove entry from JSON file
+        ConsoleStyle.Success($"{name}: 自定义路径已清除，恢复自动检测。");
+        return;
+    }
+    if (!string.IsNullOrEmpty(exec) || !string.IsNullOrEmpty(cfg))
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(toolPathFile)!);
+        ConsoleStyle.Success($"{name}: 路径已保存。");
+        if (!string.IsNullOrEmpty(exec)) ConsoleStyle.ListItem("  可执行文件", exec);
+        if (!string.IsNullOrEmpty(cfg))  ConsoleStyle.ListItem("  配置文件  ", cfg);
+        return;
+    }
+    // Show current
+    ConsoleStyle.Title($"{name} 路径配置");
+    ConsoleStyle.ListItem("  自动检测可执行", tool.IsInstalled() ? "[installed]" : "[not found]");
+    ConsoleStyle.Info("  使用 --exec <path> 或 --config <path> 设置自定义路径");
+}, pathName, pathExec, pathCfg, pathClear, pathList);
+rootCommand.AddCommand(pathCommand);
+
+// ── 10. wizard ─────────────────────────────────────────────────────────────────
 var wizardCommand = new Command("wizard", "交互式配置向导（新手推荐）");
 wizardCommand.SetHandler(async () =>
 {
