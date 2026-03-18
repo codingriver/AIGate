@@ -322,20 +322,17 @@ public abstract class ToolConfiguratorBase
 
     #region 事件
 
-    /// <summary>
-    /// 代理设置后触发
-    /// </summary>
+    /// <summary>代理设置后触发</summary>
     public event EventHandler<string>? OnProxySet;
-
-    /// <summary>
-    /// 代理清除后触发
-    /// </summary>
+    /// <summary>代理清除后触发</summary>
     public event EventHandler? OnProxyCleared;
-
-    /// <summary>
-    /// 错误时触发
-    /// </summary>
+    /// <summary>错误时触发</summary>
     public event EventHandler<Exception>? OnError;
+
+    // 供派生类调用事件的保护方法
+    protected void RaiseProxySet(string proxyUrl)     => OnProxySet?.Invoke(this, proxyUrl);
+    protected void RaiseProxyCleared()                => OnProxyCleared?.Invoke(this, EventArgs.Empty);
+    protected void RaiseError(Exception ex)           => OnError?.Invoke(this, ex);
 
     #endregion
 

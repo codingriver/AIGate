@@ -1,0 +1,22 @@
+{
+  "toolName": "vscode-insiders",
+  "displayName": "VS Code Insiders",
+  "category": "AI IDE",
+  "executable": {
+    "windows": "code-insiders.exe",
+    "linux":   "code-insiders",
+    "macos":   "code-insiders"
+  },
+  "config": {
+    "probePaths": [
+      {
+        "windows": "%APPDATA%\\Code - Insiders\\User\\settings.json",
+        "linux":   "~/.config/Code - Insiders/User/settings.json",
+        "macos":   "~/Library/Application Support/Code - Insiders/User/settings.json"
+      }
+    ],
+    "format": "json",
+    "jsonProxyPath": "http.proxy",
+    "jsonHttpsProxyPath": "http.proxy"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "toolName": "pip",
+  "displayName": "pip",
+  "category": "包管理器",
+  "executable": "pip",
+  "config": {
+    "probePaths": [
+      { "windows": "%APPDATA%\\pip\\pip.ini",                           "linux": "~/.config/pip/pip.conf",      "macos": "~/Library/Application Support/pip/pip.conf" },
+      { "windows": "%USERPROFILE%\\.pip\\pip.ini",                      "linux": "~/.pip/pip.conf",              "macos": "~/.pip/pip.conf" },
+      { "windows": "%USERPROFILE%\\.config\\pip\\pip.conf",             "linux": "~/.config/pip/pip.conf",      "macos": "~/.config/pip/pip.conf" }
+    ],
+    "format": "ini",
+    "proxyLines": [
+      { "key": "proxy", "format": "key = value", "proxyType": "all", "section": "global" }
+    ]
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "toolName": "cline",
+  "displayName": "Cline (VS Code Extension)",
+  "category": "AI 编程助手",
+  "executable": "code",
+  "config": {
+    "probePaths": [
+      {
+        "windows": "%APPDATA%\\Code\\User\\globalStorage\\saoudrizwan.claude-dev\\settings\\cline_mcp_settings.json",
+        "linux":   "~/.config/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json",
+        "macos":   "~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json"
+      }
+    ],
+    "format": "json",
+    "jsonProxyPath": "proxyUrl"
+  },
+  "notes": "Cline 同时继承 VSCode 的 http.proxy 设置"
+}

@@ -1,0 +1,21 @@
+{
+  "toolName": "mercurial",
+  "displayName": "Mercurial",
+  "category": "版本控制",
+  "executable": {
+    "windows": "hg.exe",
+    "linux":   "hg",
+    "macos":   "hg"
+  },
+  "config": {
+    "path": {
+      "windows": "%USERPROFILE%\\.hgrc",
+      "linux":   "~/.hgrc",
+      "macos":   "~/.hgrc"
+    },
+    "format": "ini",
+    "proxyLines": [
+      { "key": "host", "format": "key = value", "proxyType": "http", "section": "http_proxy" }
+    ]
+  }
+}

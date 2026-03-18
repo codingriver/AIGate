@@ -1,0 +1,12 @@
+{
+  "toolName": "nuget",
+  "displayName": "NuGet",
+  "category": "包管理器",
+  "executable": "nuget",
+  "envProxy": {
+    "httpVars":    ["HTTP_PROXY",  "http_proxy"],
+    "httpsVars":   ["HTTPS_PROXY", "https_proxy"],
+    "noProxyVars": ["NO_PROXY",    "no_proxy"],
+    "scope": "process"
+  }
+}

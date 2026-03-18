@@ -1,0 +1,18 @@
+{
+  "toolName": "git",
+  "displayName": "Git",
+  "category": "版本控制",
+  "executable": "git",
+  "config": {
+    "path": {
+      "windows": "%USERPROFILE%\\.gitconfig",
+      "linux":   "~/.gitconfig",
+      "macos":   "~/.gitconfig"
+    },
+    "format": "keyvalue",
+    "proxyLines": [
+      { "key": "http.proxy",  "format": "key = value", "proxyType": "http"  },
+      { "key": "https.proxy", "format": "key = value", "proxyType": "https" }
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "toolName": "wget",
+  "displayName": "wget",
+  "category": "下载工具",
+  "executable": "wget",
+  "config": {
+    "path": {
+      "windows": "%USERPROFILE%\\.wgetrc",
+      "linux":   "~/.wgetrc",
+      "macos":   "~/.wgetrc"
+    },
+    "format": "keyvalue",
+    "proxyLines": [
+      { "key": "http_proxy",  "format": "key = value", "proxyType": "http"  },
+      { "key": "https_proxy", "format": "key = value", "proxyType": "https" },
+      { "key": "ftp_proxy",   "format": "key = value", "proxyType": "ftp"   },
+      { "key": "no_proxy",    "format": "key = value", "proxyType": "noproxy" }
+    ]
+  }
+}

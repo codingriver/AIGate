@@ -1,0 +1,12 @@
+{
+  "toolName": "aider",
+  "displayName": "Aider",
+  "category": "AI 编程助手",
+  "executable": "aider",
+  "envProxy": {
+    "httpVars":    ["HTTP_PROXY",  "http_proxy"],
+    "httpsVars":   ["HTTPS_PROXY", "https_proxy"],
+    "noProxyVars": ["NO_PROXY",    "no_proxy"],
+    "scope": "process"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "toolName": "huggingface",
+  "displayName": "Hugging Face CLI",
+  "category": "AI 工具",
+  "executable": "huggingface-cli",
+  "envProxy": {
+    "httpVars":    ["HF_HUB_HTTP_PROXY",  "HTTP_PROXY",  "http_proxy"],
+    "httpsVars":   ["HF_HUB_HTTPS_PROXY", "HTTPS_PROXY", "https_proxy"],
+    "noProxyVars": ["NO_PROXY", "no_proxy"],
+    "scope": "user"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "toolName": "yarn",
+  "displayName": "Yarn",
+  "category": "包管理器",
+  "executable": {
+    "windows": "yarn.cmd",
+    "linux":   "yarn",
+    "macos":   "yarn"
+  },
+  "config": {
+    "path": {
+      "windows": "%USERPROFILE%\\.yarnrc.yml",
+      "linux":   "~/.yarnrc.yml",
+      "macos":   "~/.yarnrc.yml"
+    },
+    "probePaths": [
+      { "windows": "%USERPROFILE%\\.yarnrc.yml", "linux": "~/.yarnrc.yml", "macos": "~/.yarnrc.yml" },
+      { "windows": "%USERPROFILE%\\.yarnrc",     "linux": "~/.yarnrc",     "macos": "~/.yarnrc"     }
+    ],
+    "format": "keyvalue",
+    "proxyLines": [
+      { "key": "httpProxy",  "format": "key: value", "proxyType": "http",  "valueWrap": "quotes" },
+      { "key": "httpsProxy", "format": "key: value", "proxyType": "https", "valueWrap": "quotes" }
+    ]
+  }
+}

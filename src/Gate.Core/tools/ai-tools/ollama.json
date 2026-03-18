@@ -1,0 +1,13 @@
+{
+  "toolName": "ollama",
+  "displayName": "Ollama",
+  "category": "AI 工具",
+  "executable": "ollama",
+  "envProxy": {
+    "httpVars":    ["HTTP_PROXY",  "http_proxy"],
+    "httpsVars":   ["HTTPS_PROXY", "https_proxy"],
+    "noProxyVars": ["NO_PROXY",    "no_proxy"],
+    "scope": "user"
+  },
+  "notes": "Ollama 通过标准 HTTP_PROXY 环境变量配置代理，写入用户级持久化"
+}

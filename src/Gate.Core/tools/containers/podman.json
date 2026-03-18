@@ -1,0 +1,12 @@
+{
+  "toolName": "podman",
+  "displayName": "Podman",
+  "category": "容器工具",
+  "executable": "podman",
+  "envProxy": {
+    "httpVars":    ["HTTP_PROXY",  "http_proxy"],
+    "httpsVars":   ["HTTPS_PROXY", "https_proxy"],
+    "noProxyVars": ["NO_PROXY",    "no_proxy"],
+    "scope": "process"
+  }
+}

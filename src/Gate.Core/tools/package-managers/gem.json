@@ -1,0 +1,17 @@
+{
+  "toolName": "gem",
+  "displayName": "RubyGems",
+  "category": "包管理器",
+  "executable": "gem",
+  "config": {
+    "path": {
+      "windows": "%USERPROFILE%\\.gemrc",
+      "linux":   "~/.gemrc",
+      "macos":   "~/.gemrc"
+    },
+    "format": "keyvalue",
+    "proxyLines": [
+      { "key": "http_proxy", "format": "key: value", "proxyType": "all" }
+    ]
+  }
+}

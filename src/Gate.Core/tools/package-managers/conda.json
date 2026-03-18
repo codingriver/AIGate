@@ -1,0 +1,18 @@
+{
+  "toolName": "conda",
+  "displayName": "Conda",
+  "category": "包管理器",
+  "executable": "conda",
+  "config": {
+    "path": {
+      "windows": "%USERPROFILE%\\.condarc",
+      "linux":   "~/.condarc",
+      "macos":   "~/.condarc"
+    },
+    "format": "keyvalue",
+    "proxyLines": [
+      { "key": "proxy_servers.http",  "format": "key: value", "proxyType": "http"  },
+      { "key": "proxy_servers.https", "format": "key: value", "proxyType": "https" }
+    ]
+  }
+}

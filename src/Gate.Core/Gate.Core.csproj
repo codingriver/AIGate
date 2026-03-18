@@ -12,4 +12,9 @@
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
   </ItemGroup>
 
+  <!-- 将 tools/ 下所有 JSON 作为嵌入资源打包进 DLL -->
+  <ItemGroup>
+    <EmbeddedResource Include="tools\**\*.json" />
+  </ItemGroup>
+
 </Project>

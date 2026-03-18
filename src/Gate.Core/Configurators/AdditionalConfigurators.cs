@@ -149,3 +149,53 @@ public class CloudflaredConfigurator : ToolConfiguratorBase
     public override string ToolName => "cloudflared";
     public override string Category => "网络工具";
 }
+
+/// <summary>
+/// TortoiseGit 配置器
+/// TortoiseGit 读取 git 全局配置（~/.gitconfig）中的 http.proxy / https.proxy，
+/// 因此代理设置方式与 Git 完全相同。
+/// 安装检测：Windows 注册表 HKLM\SOFTWARE\TortoiseGit 或可执行文件 TortoiseGitProc.exe
+/// </summary>
+public class TortoiseGitConfigurator : GitConfigurator
+{
+    public override string ToolName => "tortoisegit";
+    public override string Category => "版本控制";
+
+    public override bool IsInstalled()
+    {
+        // 1. 检查 PATH 中是否有 TortoiseGitProc.exe
+        var exe = FindToolInPath("TortoiseGitProc");
+        if (!string.IsNullOrEmpty(exe)) return true;
+
+        // 2. 检查常见安装路径（Windows）
+        var programFiles = new[]
+        {
+            Environment.GetEnvironmentVariable("ProgramFiles"),
+            Environment.GetEnvironmentVariable("ProgramFiles(x86)")
+        };
+        foreach (var pf in programFiles)
+        {
+            if (string.IsNullOrEmpty(pf)) continue;
+            var path = System.IO.Path.Combine(pf, "TortoiseGit", "bin", "TortoiseGitProc.exe");
+            if (System.IO.File.Exists(path)) return true;
+        }
+
+        return false;
+    }
+
+    public override bool SetProxy(string proxyUrl)
+    {
+        var result = base.SetProxy(proxyUrl);
+        if (result)
+            Console.WriteLine("\U0001f4a1 TortoiseGit 使用 git 全局配置（~/.gitconfig）中的代理，重启资源管理器后生效。");
+        return result;
+    }
+
+    public override bool ClearProxy()
+    {
+        var result = base.ClearProxy();
+        if (result)
+            Console.WriteLine("\u2705 TortoiseGit 代理配置已清除（通过 .gitconfig）。");
+        return result;
+    }
+}

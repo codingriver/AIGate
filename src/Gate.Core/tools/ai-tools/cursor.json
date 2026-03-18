@@ -1,0 +1,22 @@
+{
+  "toolName": "cursor",
+  "displayName": "Cursor",
+  "category": "AI IDE",
+  "executable": {
+    "windows": "cursor.exe",
+    "linux":   "cursor",
+    "macos":   "cursor"
+  },
+  "config": {
+    "probePaths": [
+      {
+        "windows": "%APPDATA%\\Cursor\\User\\settings.json",
+        "linux":   "~/.config/Cursor/User/settings.json",
+        "macos":   "~/Library/Application Support/Cursor/User/settings.json"
+      }
+    ],
+    "format": "json",
+    "jsonProxyPath": "http.proxy",
+    "jsonHttpsProxyPath": "http.proxy"
+  }
+}

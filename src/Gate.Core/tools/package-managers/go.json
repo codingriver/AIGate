@@ -1,0 +1,13 @@
+{
+  "toolName": "go",
+  "displayName": "Go",
+  "category": "编程语言",
+  "executable": "go",
+  "envProxy": {
+    "httpVars":    ["GOPROXY", "HTTP_PROXY",  "http_proxy"],
+    "httpsVars":   ["GOPROXY", "HTTPS_PROXY", "https_proxy"],
+    "noProxyVars": ["GONOSUMCHECK", "NO_PROXY", "no_proxy"],
+    "scope": "user"
+  },
+  "notes": "Go modules 优先使用 GOPROXY 环境变量"
+}

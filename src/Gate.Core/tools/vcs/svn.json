@@ -1,0 +1,18 @@
+{
+  "toolName": "svn",
+  "displayName": "Subversion",
+  "category": "版本控制",
+  "executable": "svn",
+  "config": {
+    "path": {
+      "windows": "%APPDATA%\\Subversion\\servers",
+      "linux":   "~/.subversion/servers",
+      "macos":   "~/.subversion/servers"
+    },
+    "format": "ini",
+    "proxyLines": [
+      { "key": "http-proxy-host", "format": "key = value", "proxyType": "http",  "section": "global" },
+      { "key": "http-proxy-port", "format": "key = value", "proxyType": "http",  "section": "global" }
+    ]
+  }
+}

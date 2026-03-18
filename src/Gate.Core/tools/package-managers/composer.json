@@ -1,0 +1,13 @@
+{
+  "toolName": "composer",
+  "displayName": "Composer (PHP)",
+  "category": "包管理器",
+  "executable": "composer",
+  "envProxy": {
+    "httpVars":    ["HTTP_PROXY",  "http_proxy"],
+    "httpsVars":   ["HTTPS_PROXY", "https_proxy"],
+    "noProxyVars": ["NO_PROXY",    "no_proxy"],
+    "scope": "process"
+  },
+  "notes": "Composer 使用标准 HTTP_PROXY 环境变量"
+}

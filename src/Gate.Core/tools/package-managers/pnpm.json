@@ -1,0 +1,22 @@
+{
+  "toolName": "pnpm",
+  "displayName": "pnpm",
+  "category": "包管理器",
+  "executable": {
+    "windows": "pnpm.cmd",
+    "linux":   "pnpm",
+    "macos":   "pnpm"
+  },
+  "config": {
+    "path": {
+      "windows": "%USERPROFILE%\\.npmrc",
+      "linux":   "~/.npmrc",
+      "macos":   "~/.npmrc"
+    },
+    "format": "keyvalue",
+    "proxyLines": [
+      { "key": "proxy",       "format": "key=value", "proxyType": "http"  },
+      { "key": "https-proxy", "format": "key=value", "proxyType": "https" }
+    ]
+  }
+}

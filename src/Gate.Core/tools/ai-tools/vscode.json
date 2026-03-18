@@ -1,0 +1,22 @@
+{
+  "toolName": "vscode",
+  "displayName": "Visual Studio Code",
+  "category": "AI IDE",
+  "executable": {
+    "windows": "code.exe",
+    "linux":   "code",
+    "macos":   "code"
+  },
+  "config": {
+    "probePaths": [
+      {
+        "windows": "%APPDATA%\\Code\\User\\settings.json",
+        "linux":   "~/.config/Code/User/settings.json",
+        "macos":   "~/Library/Application Support/Code/User/settings.json"
+      }
+    ],
+    "format": "json",
+    "jsonProxyPath": "http.proxy",
+    "jsonHttpsProxyPath": "http.proxy"
+  }
+}

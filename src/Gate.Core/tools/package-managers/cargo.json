@@ -1,0 +1,21 @@
+{
+  "toolName": "cargo",
+  "displayName": "Cargo (Rust)",
+  "category": "包管理器",
+  "executable": "cargo",
+  "config": {
+    "path": {
+      "windows": "%USERPROFILE%\\.cargo\\config.toml",
+      "linux":   "~/.cargo/config.toml",
+      "macos":   "~/.cargo/config.toml"
+    },
+    "probePaths": [
+      { "windows": "%USERPROFILE%\\.cargo\\config.toml", "linux": "~/.cargo/config.toml", "macos": "~/.cargo/config.toml" },
+      { "windows": "%USERPROFILE%\\.cargo\\config",      "linux": "~/.cargo/config",      "macos": "~/.cargo/config"      }
+    ],
+    "format": "keyvalue",
+    "proxyLines": [
+      { "key": "http.proxy", "format": "key = value", "proxyType": "all", "valueWrap": "quotes" }
+    ]
+  }
+}

@@ -9,29 +9,38 @@
 .PARAMETER fd
     框架依赖发布（需目标机安装 .NET 运行时）。省略则为自包含
 
+.PARAMETER clean
+    仅清理：删除 publish/ 目录及 src/**/obj、src/**/bin，不执行编译和发布
+
 .PARAMETER Runtimes
     要发布的运行时，逗号分隔。默认：win-x64,linux-x64,osx-x64
+    可作为第一个位置参数直接传入，无需 -Runtimes
 
 .EXAMPLE
     # 1）默认：自包含，多平台（win/linux/osx），输出到 publish/gate-*/ 目录
     .\build.ps1
 
-    # 2）框架依赖发布（体积更小，需要目标机器已安装 .NET 运行时）
+    # 2）只发布 Windows x64（位置参数，无需 -Runtimes）
+    .\build.ps1 win-x64
+
+    # 3）同时发布 Windows/Linux
+    .\build.ps1 win-x64,linux-x64
+
+    # 4）框架依赖发布（体积更小，需要目标机器已安装 .NET 运行时）
     .\build.ps1 -fd
-    .\build.ps1 -Runtimes "win-x64" -fd
-
-    # 3）只发布 Windows x64，自包含
-    .\build.ps1 -Runtimes "win-x64"
-
-    # 4）同时发布 Windows/Linux，自包含
-    .\build.ps1 -Runtimes "win-x64,linux-x64"
+    .\build.ps1 win-x64 -fd
 
     # 5）发布时在标题中展示自定义版本号（不影响程序集 Version，仅为脚本显示）
     .\build.ps1 -Version "1.2.3"
+
+    # 6）仅清理，不编译
+    .\build.ps1 -clean
 #>
 
 param(
     [switch]$fd,
+    [switch]$clean,
+    [Parameter(Position=0)]
     [string]$Runtimes = "win-x64,linux-x64,osx-x64",
     [string]$Version = "1.0.0",
     [string]$UnityPkgPath = "D:\UniToolGUI\UnityPackage\Gate"
@@ -47,6 +56,35 @@ $SrcDir = Join-Path $ScriptDir "src"
 $PublishDir = Join-Path $ScriptDir "publish"
 $SlnPath = Join-Path $SrcDir "Gate.sln"
 $CliProject = Join-Path $SrcDir "Gate.CLI\Gate.CLI.csproj"
+
+# ── Clean-only mode ──────────────────────────────────────────────────────────
+if ($clean) {
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host "  Gate Build Script - Clean Only" -ForegroundColor Cyan
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host ""
+
+    if (Test-Path $PublishDir) {
+        Write-Host "Removing publish/..." -ForegroundColor Yellow
+        Remove-Item $PublishDir -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Host "  Done" -ForegroundColor Green
+    } else {
+        Write-Host "publish/ not found, skipping." -ForegroundColor Gray
+    }
+
+    Write-Host "" 
+    Write-Host "Removing src/**/obj and src/**/bin..." -ForegroundColor Yellow
+    $objDirs = Get-ChildItem -Path $SrcDir -Directory -Recurse -Filter "obj" -ErrorAction SilentlyContinue
+    $binDirs = Get-ChildItem -Path $SrcDir -Directory -Recurse -Filter "bin" -ErrorAction SilentlyContinue
+    foreach ($d in $objDirs + $binDirs) {
+        Remove-Item $d.FullName -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    Write-Host "  Done" -ForegroundColor Green
+
+    Write-Host ""
+    Write-Host "Clean completed." -ForegroundColor Green
+    exit 0
+}
 
 $RuntimeList = $Runtimes -split "," | ForEach-Object { $_.Trim() }
 $DeploySuffix = if ($SelfContained) { "" } else { "-fd" }

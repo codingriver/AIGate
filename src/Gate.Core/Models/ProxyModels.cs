@@ -37,6 +37,7 @@ public class ProxyConfig
 /// </summary>
 public enum EnvLevel
 {
+    Process,
     User,
     System
 }

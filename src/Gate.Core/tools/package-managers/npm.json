@@ -1,0 +1,22 @@
+{
+  "toolName": "npm",
+  "displayName": "npm",
+  "category": "包管理器",
+  "executable": {
+    "windows": "npm.cmd",
+    "linux":   "npm",
+    "macos":   "npm"
+  },
+  "config": {
+    "path": {
+      "windows": "%USERPROFILE%\\.npmrc",
+      "linux":   "~/.npmrc",
+      "macos":   "~/.npmrc"
+    },
+    "format": "keyvalue",
+    "proxyLines": [
+      { "key": "proxy",       "format": "key=value", "proxyType": "http"  },
+      { "key": "https-proxy", "format": "key=value", "proxyType": "https" }
+    ]
+  }
+}

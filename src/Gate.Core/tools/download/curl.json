@@ -1,0 +1,18 @@
+{
+  "toolName": "curl",
+  "displayName": "curl",
+  "category": "下载工具",
+  "executable": "curl",
+  "config": {
+    "path": {
+      "windows": "%USERPROFILE%\\.curlrc",
+      "linux":   "~/.curlrc",
+      "macos":   "~/.curlrc"
+    },
+    "format": "keyvalue",
+    "proxyLines": [
+      { "key": "proxy",    "format": "key = value", "proxyType": "all" },
+      { "key": "noproxy",  "format": "key = value", "proxyType": "noproxy" }
+    ]
+  }
+}

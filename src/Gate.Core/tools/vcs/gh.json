@@ -1,0 +1,13 @@
+{
+  "toolName": "gh",
+  "displayName": "GitHub CLI",
+  "category": "版本控制",
+  "executable": "gh",
+  "envProxy": {
+    "httpVars":    ["HTTP_PROXY",  "http_proxy"],
+    "httpsVars":   ["HTTPS_PROXY", "https_proxy"],
+    "noProxyVars": ["NO_PROXY",    "no_proxy"],
+    "scope": "process"
+  },
+  "notes": "GitHub CLI 通过标准 HTTP_PROXY / HTTPS_PROXY 环境变量配置代理"
+}

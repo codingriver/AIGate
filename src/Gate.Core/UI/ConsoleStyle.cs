@@ -25,10 +25,9 @@ namespace Gate.UI
         public const string BG_BLUE   = "\u001b[44m";
         public const string BG_CYAN   = "\u001b[46m";
 
-        /// <summary>是否启用彩色输出（CI 环境可关闭）</summary>
-        public static bool EnableColors { get; set; } =
-            !Console.IsOutputRedirected &&
-            Environment.GetEnvironmentVariable("NO_COLOR") == null;
+        /// <summary>是否启用彩色输出（由 OutputSettings.NoColor 统一控制）</summary>
+        public static bool EnableColors =>
+            !OutputSettings.NoColor;
 
         // ── 语义化输出方法 ───────────────────────────────────────────────────
 
@@ -42,8 +41,8 @@ namespace Gate.UI
         /// <summary>错误（红色 ✗）</summary>
         public static void Error(string message)
         {
-            if (EnableColors) Console.Error.WriteLine($"{FG_RED}✗{RESET} {message}");
-            else              Console.Error.WriteLine($"[ERR] {message}");
+            if (EnableColors) Console.WriteLine($"{FG_RED}✗{RESET} {message}");
+            else              Console.WriteLine($"[ERR] {message}");
         }
 
         /// <summary>警告（黄色 ⚠）</summary>
@@ -63,11 +62,15 @@ namespace Gate.UI
         /// <summary>一级标题（粗体青色，前置空行）</summary>
         public static void Title(string title)
         {
-            Console.WriteLine();
-            if (EnableColors) Console.WriteLine($"{BOLD}{FG_CYAN}{title}{RESET}");
-            else              Console.WriteLine(title);
-            if (EnableColors) Console.WriteLine($"{FG_BLACK}{new string('─', Math.Min(title.Length + 2, 60))}{RESET}");
-            else              Console.WriteLine(new string('─', Math.Min(title.Length + 2, 60)));
+            var divider = new string('─', Math.Min(title.Length + 2, 60));
+            if (EnableColors)
+            {
+                Console.WriteLine($"\n{BOLD}{FG_CYAN}{title}{RESET}\n{FG_BLACK}{divider}{RESET}");
+            }
+            else
+            {
+                Console.WriteLine($"\n{title}\n{divider}");
+            }
         }
 
         /// <summary>二级标题（粗体白色）</summary>

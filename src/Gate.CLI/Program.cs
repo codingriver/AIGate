@@ -1,497 +1,377 @@
 using System;
 using System.CommandLine;
 using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Gate.CLI.Commands;
+using Gate.CLI.Display;
 using Gate.Managers;
 using Gate.Models;
 using Gate.UI;
 
-var rootCommand = new RootCommand("Gate - 跨平台代理配置管理工具");
+Console.OutputEncoding = Encoding.UTF8;
+Console.InputEncoding  = Encoding.UTF8;
 
-void PrintProxyTable(ProxyConfig cfg)
+// ── Pre-parse: global output flags ───────────────────────────────────────────
 {
-    ConsoleStyle.ListItem("HTTP_PROXY ", cfg.HttpProxy  ?? "(not set)");
-    ConsoleStyle.ListItem("HTTPS_PROXY", cfg.HttpsProxy ?? "(not set)");
-    ConsoleStyle.ListItem("NO_PROXY   ", cfg.NoProxy    ?? "(not set)");
+    var a = args.ToList();
+    if (a.Remove("--json"))     { OutputSettings.Mode = OutputMode.Json;    args = a.ToArray(); }
+    if (a.Remove("--quiet"))    { OutputSettings.Mode = OutputMode.Quiet;   args = a.ToArray(); }
+    if (a.Remove("--no-color")) { OutputSettings.Mode = OutputMode.NoColor; args = a.ToArray(); }
+    if (a.Remove("--plain"))    { OutputSettings.Mode = OutputMode.Plain;   args = a.ToArray(); }
+    if (args.Length == 0) { StatusPrinter.PrintStatusOverview(); return 0; }
+    if (args.Length == 1 && (args[0] is "-h" or "--help" or "help"))
+    { HelpPrinter.Print(null); return 0; }
+    for (var i = 1; i < Math.Min(args.Length, 3); i++)
+        if (args[i] is "-h" or "--help") { HelpPrinter.Print(args[0]); return 0; }
 }
 
-void PrintToolList()
+var root = new RootCommand("Gate - 跨平台代理配置管理工具");
+root.SetHandler(StatusPrinter.PrintStatusOverview);
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+static async Task SetToolProxies(string names, string proxy)
 {
-    ConsoleStyle.Title("支持的应用列表 (Supported Apps)");
-    foreach (var cat in ToolRegistry.GetCategories())
+    foreach (var n in names.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
     {
-        ConsoleStyle.Subtitle($"  [{cat}]");
-        foreach (var t in ToolRegistry.GetByCategory(cat))
-        {
-            var inst   = t.IsInstalled() ? "[installed]" : "[not installed]";
-            var cfg    = t.GetCurrentConfig();
-            var status = cfg != null && !cfg.IsEmpty ? "[configured]" : "[not configured]";
-            Console.WriteLine($"    {t.ToolName,-24} {inst,-18} {status}");
-        }
+        var tool = ToolRegistry.GetByName(n);
+        if (tool == null)        { ConsoleStyle.Error($"{n}: 未找到"); continue; }
+        if (!tool.IsInstalled()) { ConsoleStyle.Warning($"{n}: 未安装，跳过"); continue; }
+        if (tool.SetProxy(proxy)) ConsoleStyle.Success($"{n}: 代理已设置 -> {proxy}");
+        else                      ConsoleStyle.Error($"{n}: 设置失败");
+    }
+    await Task.CompletedTask;
+}
+static void ClearToolProxies(string names)
+{
+    foreach (var n in names.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+    {
+        var tool = ToolRegistry.GetByName(n);
+        if (tool == null)        { ConsoleStyle.Error($"{n}: 未找到"); continue; }
+        if (!tool.IsInstalled()) { ConsoleStyle.Warning($"{n}: 未安装，跳过"); continue; }
+        if (tool.ClearProxy()) ConsoleStyle.Success($"{n}: 代理已清除");
+        else                   ConsoleStyle.Error($"{n}: 清除失败");
     }
 }
-
-void PrintPresetList()
+static void WriteRegistry()
 {
-    var profiles = ProfileManager.List();
-    var def      = ProfileManager.GetDefaultProfile();
-    if (profiles.Count == 0)
+    if (!System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+            System.Runtime.InteropServices.OSPlatform.Windows))
+    { ConsoleStyle.Error("--write-registry 仅支持 Windows"); return; }
+    var up = EnvVarManager.GetProxyConfig(EnvLevel.User);
+    var rp = up.HttpProxy ?? up.HttpsProxy;
+    if (string.IsNullOrEmpty(rp)) { ConsoleStyle.Warning("未设置用户级代理"); return; }
+    try
     {
-        ConsoleStyle.Info("  暂无已保存的预设。");
-        ConsoleStyle.Info("  运行 `gate preset --name <name> --save` 保存当前配置。");
-        return;
+        using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
+            @"Software\Microsoft\Windows\CurrentVersion\Internet Settings", writable: true);
+        if (key == null) { ConsoleStyle.Error("无法打开注册表键"); return; }
+        key.SetValue("ProxyEnable", 1, Microsoft.Win32.RegistryValueKind.DWord);
+        key.SetValue("ProxyServer", rp,  Microsoft.Win32.RegistryValueKind.String);
+        if (!string.IsNullOrEmpty(up.NoProxy))
+            key.SetValue("ProxyOverride", up.NoProxy, Microsoft.Win32.RegistryValueKind.String);
+        ConsoleStyle.Success($"Windows 系统代理已写入注册表: {rp}");
     }
-    foreach (var p in profiles)
+    catch (Exception ex) { ConsoleStyle.Error($"写入注册表失败: {ex.Message}"); }
+}
+
+// ── gate set ─────────────────────────────────────────────────────────────────
+var setCmd    = new Command("set", "设置全局代理，可同时配置工具代理");
+var sProxy    = new Argument<string?>("proxy", () => null, "代理地址，如 http://127.0.0.1:7890");
+var sTools    = new Argument<string?>("tools", () => null, "工具名称，逗号分隔（可选）");
+var sVerify   = new Option<bool>(new[]{"--verify","-v"}, "设置前测试连通性");
+var sNoProxy  = new Option<string?>("--no-proxy", "NO_PROXY 排除列表");
+var sHistIdx  = new Option<int>("--history-index", () => 0, "从历史记录选择（序号从 1 开始）");
+var sLegG     = new Option<string?>(new[]{"-g","--global"}, "[旧]") { IsHidden = true };
+var sLegA     = new Option<string?>(new[]{"-a","--app"   }, "[旧]") { IsHidden = true };
+var sLegP     = new Option<string?>(new[]{"-p","--proxy" }, "[旧]") { IsHidden = true };
+setCmd.AddArgument(sProxy); setCmd.AddArgument(sTools);
+setCmd.AddOption(sVerify); setCmd.AddOption(sNoProxy); setCmd.AddOption(sHistIdx);
+setCmd.AddOption(sLegG); setCmd.AddOption(sLegA); setCmd.AddOption(sLegP);
+setCmd.SetHandler(async (string? proxy, string? tools, bool verify, string? noProxy,
+                         int histIdx, string? legG, string? legA, string? legP) =>
+{
+    var rProxy = proxy ?? legG ?? legP;
+    var rTools = tools ?? legA;
+    if (histIdx > 0)
     {
-        var marker = p == def ? " <- default" : "";
-        if (ConsoleStyle.EnableColors)
-            Console.WriteLine($"  {(p == def ? ConsoleStyle.FG_GREEN : ConsoleStyle.FG_WHITE)}- {p}{marker}{ConsoleStyle.RESET}");
-        else
-            Console.WriteLine($"  - {p}{marker}");
+        var hist = ProxyHistory.Load();
+        if (histIdx > hist.Count) { ConsoleStyle.Error($"编号超出范围（共 {hist.Count} 条）"); return; }
+        rProxy = hist[histIdx - 1]; ConsoleStyle.Info($"从历史记录选择: {rProxy}");
     }
-}
+    if (string.IsNullOrEmpty(rProxy))
+    { ConsoleStyle.Warning("请指定代理地址。用法：gate set <proxy> [tools]"); return; }
+    if (verify)
+    {
+        ConsoleStyle.Info($"正在测试 {rProxy}...");
+        var r = await ProxyTester.TestProxyAsync(rProxy);
+        if (!r.Success) { ConsoleStyle.Error($"代理测试失败: {r.ErrorMessage}"); return; }
+        ConsoleStyle.Success($"代理可用，响应时间: {r.ResponseTimeMs}ms");
+    }
+    EnvVarManager.SetProxyForCurrentProcess(new ProxyConfig
+        { HttpProxy = rProxy, HttpsProxy = rProxy, NoProxy = noProxy });
+    ProxyHistory.Push(rProxy);
+    ConsoleStyle.Success($"全局代理已设置 -> {rProxy}");
+    if (!string.IsNullOrEmpty(noProxy)) ConsoleStyle.Info($"  NO_PROXY: {noProxy}");
+    if (!string.IsNullOrEmpty(rTools)) await SetToolProxies(rTools, rProxy);
+    ConsoleStyle.Info("提示：运行 `gate install-shell-hook` 可让代理在新终端自动生效。");
+}, sProxy, sTools, sVerify, sNoProxy, sHistIdx, sLegG, sLegA, sLegP);
+root.AddCommand(setCmd);
 
-void ApplyPreset(string name)
+// ── gate clear ────────────────────────────────────────────────────────────────
+var clearCmd   = new Command("clear", "清除全局代理或工具代理");
+var clTools    = new Argument<string?>("tools", () => null);
+var clGlobal   = new Option<bool>("--global");
+var clAll      = new Option<bool>("--all", "清除全局代理 + 所有工具代理");
+clearCmd.AddArgument(clTools); clearCmd.AddOption(clGlobal); clearCmd.AddOption(clAll);
+clearCmd.SetHandler((string? tools, bool global, bool all) =>
 {
-    var profile = ProfileManager.Load(name);
-    if (profile == null) { ConsoleStyle.Error($"预设不存在: {name}"); return; }
-    EnvVarManager.SetProxyForCurrentProcess(profile.EnvVars);
-    ConsoleStyle.Success($"预设 '{name}' 已应用");
-    PrintProxyTable(profile.EnvVars);
-    if (profile.ToolConfigs.Count > 0)
-        ConsoleStyle.Info($"  包含 {profile.ToolConfigs.Count} 个应用代理配置");
-    ConsoleStyle.Info("  提示：运行 `gate info` 查看完整状态。");
-}
-
-// ── 1. global / env ──────────────────────────────────────────────────────────
-var globalCommand = new Command("global", "全局代理环境变量管理");
-var envCommand    = new Command("env",    "全局代理环境变量管理 (别名: global)");
-
-var gProxy  = new Option<string?>(new[]{"--proxy", "-p"}, "代理地址（同时设置 HTTP/HTTPS）");
-var gHttp   = new Option<string?>("-H",                   "单独指定 HTTP 代理");
-var gHttps  = new Option<string?>("-S",                   "单独指定 HTTPS 代理");
-var gNone   = new Option<string?>("--no-proxy",            "NO_PROXY 排除列表");
-var gClear  = new Option<bool>(new[]{"--clear",  "-c"}, "清除代理配置");
-var gVerify = new Option<bool>(new[]{"--verify", "-v"}, "设置前测试连通性");
-
-foreach (var cmd in new Command[]{globalCommand, envCommand})
-{
-    cmd.AddOption(gProxy); cmd.AddOption(gHttp); cmd.AddOption(gHttps);
-    cmd.AddOption(gNone);  cmd.AddOption(gClear); cmd.AddOption(gVerify);
-}
-
-Func<string?,string?,string?,string?,bool,bool,Task> globalHandler = async (proxy, http, https, noProxy, clear, verify) =>
-{
-    if (clear)
+    if (all)
     {
         EnvVarManager.SetProxyForCurrentProcess(new ProxyConfig());
         ConsoleStyle.Success("全局代理已清除。");
-        return;
+        var cnt = 0;
+        foreach (var t in ToolRegistry.GetAllTools())
+            if (t.IsInstalled() && t.ClearProxy()) cnt++;
+        ConsoleStyle.Info($"共清除 {cnt} 个工具的代理配置。"); return;
     }
-    var httpVal  = proxy ?? http;
-    var httpsVal = proxy ?? https;
-    if (string.IsNullOrEmpty(httpVal) && string.IsNullOrEmpty(httpsVal))
+    if (string.IsNullOrEmpty(tools))
+    { EnvVarManager.SetProxyForCurrentProcess(new ProxyConfig()); ConsoleStyle.Success("全局代理已清除。"); }
+    else
     {
-        ConsoleStyle.Title("当前全局代理 (Global Proxy)");
-        PrintProxyTable(EnvVarManager.GetProxyConfig(EnvLevel.User));
-        ConsoleStyle.Info("  提示：使用 -p <地址> 设置代理，--clear 清除。");
-        return;
+        ClearToolProxies(tools);
+        if (global) { EnvVarManager.SetProxyForCurrentProcess(new ProxyConfig()); ConsoleStyle.Success("全局代理已清除。"); }
     }
-    if (verify)
-    {
-        ConsoleStyle.Info($"正在测试 {httpVal ?? httpsVal}...");
-        var r = await ProxyTester.TestProxyAsync(httpVal ?? httpsVal);
-        if (!r.Success) { ConsoleStyle.Error($"代理测试失败: {r.ErrorMessage}"); return; }
-        ConsoleStyle.Success($"代理可用，响应时间: {r.ResponseTimeMs}ms");
-    }
-    var cfg = new ProxyConfig
-    {
-        HttpProxy  = httpVal,
-        HttpsProxy = httpsVal ?? httpVal,
-        NoProxy    = noProxy
-    };
-    EnvVarManager.SetProxyForCurrentProcess(cfg);
-    ConsoleStyle.Success($"全局代理已设置 -> {httpVal}");
-    if (!string.IsNullOrEmpty(noProxy))
-        ConsoleStyle.Info($"  NO_PROXY: {noProxy}");
-    ConsoleStyle.Info("  提示：运行 `gate app -n git,npm -p <地址>` 为应用单独配置。");
-};
+}, clTools, clGlobal, clAll);
+root.AddCommand(clearCmd);
 
-globalCommand.SetHandler(globalHandler, gProxy, gHttp, gHttps, gNone, gClear, gVerify);
-envCommand.SetHandler(   globalHandler, gProxy, gHttp, gHttps, gNone, gClear, gVerify);
-rootCommand.AddCommand(globalCommand);
-rootCommand.AddCommand(envCommand);
-
-// ── 2. app / tool ─────────────────────────────────────────────────────────────
-var appCommand  = new Command("app",  "应用代理配置（支持批量）");
-var toolCommand = new Command("tool", "应用代理配置 (别名: app)");
-
-var aName  = new Option<string?>(new[]{"--name","-n"}, "应用名称，逗号分隔，如 git,npm");
-var aProxy = new Option<string?>(new[]{"--proxy","-p"}, "代理地址");
-var aClear = new Option<bool>(   new[]{"--clear","-c"}, "清除应用代理");
-var aList  = new Option<bool>(   new[]{"--list", "-l"}, "列出所有支持的应用");
-
-foreach (var cmd in new Command[]{appCommand, toolCommand})
-    { cmd.AddOption(aName); cmd.AddOption(aProxy); cmd.AddOption(aClear); cmd.AddOption(aList); }
-
-Func<string?,string?,bool,bool,Task> appHandler = async (name, proxy, clear, list) =>
+// ── gate app ──────────────────────────────────────────────────────────────────
+var appCmd    = new Command("app", "查看或设置工具代理（支持批量）");
+var appName   = new Argument<string?>("name",  () => null);
+var appProxy  = new Argument<string?>("proxy", () => null);
+var appClear  = new Option<bool>(new[]{"--clear","-c"});
+var appAll    = new Option<bool>("--all");
+var appExcept = new Option<string?>("--except");
+var appLegN   = new Option<string?>("--name",  "[旧]") { IsHidden = true };
+var appLegP   = new Option<string?>("--proxy", "[旧]") { IsHidden = true };
+appCmd.AddArgument(appName); appCmd.AddArgument(appProxy);
+appCmd.AddOption(appClear); appCmd.AddOption(appAll); appCmd.AddOption(appExcept);
+appCmd.AddOption(appLegN); appCmd.AddOption(appLegP);
+appCmd.SetHandler(async (string? name, string? proxy, bool clear, bool all,
+                         string? except, string? legN, string? legP) =>
 {
     await Task.CompletedTask;
-    if (list) { PrintToolList(); return; }
-    if (string.IsNullOrEmpty(name))
+    var rName = name ?? legN; var rProxy = proxy ?? legP;
+    if (all)
     {
-        ConsoleStyle.Warning("请使用 --name/-n 指定应用，或 --list/-l 查看所有应用。");
+        var excl = new System.Collections.Generic.HashSet<string>(
+            (except ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+            StringComparer.OrdinalIgnoreCase);
+        var tgts = ToolRegistry.GetAllTools().Where(t => t.IsInstalled() && !excl.Contains(t.ToolName)).ToList();
+        if (clear)  { foreach (var t in tgts) if (t.ClearProxy()) ConsoleStyle.Success($"{t.ToolName}: 代理已清除"); return; }
+        if (!string.IsNullOrEmpty(rProxy))
+        { foreach (var t in tgts) if (t.SetProxy(rProxy)) ConsoleStyle.Success($"{t.ToolName}: 代理已设置"); return; }
+        foreach (var t in tgts) { var c = t.GetCurrentConfig(); if (c != null && !c.IsEmpty) ConsoleStyle.ListItem(t.ToolName.PadRight(22), c.ToString()); }
         return;
     }
-    var names = name.Split(",", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-    foreach (var n in names)
+    if (string.IsNullOrEmpty(rName)) { ConsoleStyle.Warning("请指定工具名。用法：gate app <name> [proxy]"); return; }
+    foreach (var n in rName.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
     {
         var tool = ToolRegistry.GetByName(n);
-        if (tool == null) { ConsoleStyle.Error($"{n}: 未找到 (使用 --list 查看应用列表)"); continue; }
-        if (!tool.IsInstalled()) { ConsoleStyle.Warning($"{n}: 未安装，跳过"); continue; }
-        if (clear)
+        if (tool == null) { ConsoleStyle.Error($"{n}: 未找到"); continue; }
+        if (clear) { if (tool.IsInstalled() && tool.ClearProxy()) ConsoleStyle.Success($"{n}: 代理已清除"); continue; }
+        if (!string.IsNullOrEmpty(rProxy))
         {
-            if (tool.ClearProxy()) ConsoleStyle.Success($"{n}: 代理已清除");
-            else ConsoleStyle.Error($"{n}: 清除失败");
-            continue;
-        }
-        if (!string.IsNullOrEmpty(proxy))
-        {
-            if (tool.SetProxy(proxy)) ConsoleStyle.Success($"{n}: 代理已设置 -> {proxy}");
-            else ConsoleStyle.Error($"{n}: 设置失败");
-            continue;
+            if (!rProxy.Contains("://")) { ConsoleStyle.Error($"{n}: 代理地址无效"); continue; }
+            if (!tool.IsInstalled()) { ConsoleStyle.Warning($"{n}: 未安装，跳过"); continue; }
+            if (tool.SetProxy(rProxy)) ConsoleStyle.Success($"{n}: 代理已设置 -> {rProxy}"); continue;
         }
         var cfg = tool.GetCurrentConfig();
-        if (cfg != null && !cfg.IsEmpty) ConsoleStyle.ListItem(n.PadRight(22), cfg.ToString());
-        else ConsoleStyle.Info($"{n}: 未配置代理");
+        ConsoleStyle.ListItem(n.PadRight(22) + (tool.IsInstalled() ? "" : " [未安装]"),
+            cfg != null && !cfg.IsEmpty ? cfg.ToString() : "(未配置)");
     }
-};
+}, appName, appProxy, appClear, appAll, appExcept, appLegN, appLegP);
+root.AddCommand(appCmd);
+root.AddCommand(new Command("tool", "[旧]") { IsHidden = true });
 
-appCommand.SetHandler( appHandler, aName, aProxy, aClear, aList);
-toolCommand.SetHandler(appHandler, aName, aProxy, aClear, aList);
-rootCommand.AddCommand(appCommand);
-rootCommand.AddCommand(toolCommand);
+// ── gate apps ─────────────────────────────────────────────────────────────────
+var appsCmd  = new Command("apps", "列出所有支持的工具（含安装和代理状态）");
+var appsInst = new Option<bool>(new[]{"--installed","-i"}, "只显示已安装的工具");
+appsCmd.AddOption(appsInst);
+appsCmd.SetHandler((bool i) => StatusPrinter.PrintToolList(i), appsInst);
+root.AddCommand(appsCmd);
 
-// ── 3. preset / profile ───────────────────────────────────────────────────────
-var presetCommand  = new Command("preset",  "预设配置集管理");
-var profileCommand = new Command("profile", "预设配置集管理 (别名: preset)");
-
-var pName    = new Option<string?>(new[]{"--name","-n"}, "预设名称");
-var pSave    = new Option<bool>(  "--save",              "保存当前配置为预设");
-var pLoad    = new Option<bool>(  "--load",              "加载/应用预设");
-var pDelete  = new Option<bool>(  "--delete",            "删除预设");
-var pList    = new Option<bool>(  new[]{"--list","-l"}, "列出所有预设");
-var pDefault = new Option<bool>(  "--set-default",       "设为默认预设");
-
-foreach (var cmd in new Command[]{presetCommand, profileCommand})
+// ── gate env ──────────────────────────────────────────────────────────────────
+var envCmd  = new Command("env", "查看环境变量代理（Machine / User / Process 三层）");
+var eP      = new Option<string?>(new[]{"--proxy","-p"}) { IsHidden = true };
+var eH      = new Option<string?>("-H") { IsHidden = true };
+var eS      = new Option<string?>("-S") { IsHidden = true };
+var eN      = new Option<string?>("--no-proxy") { IsHidden = true };
+var eC      = new Option<bool>(new[]{"--clear","-c"}) { IsHidden = true };
+var eV      = new Option<bool>(new[]{"--verify","-v"}) { IsHidden = true };
+var eWR     = new Option<bool>("--write-registry", "将代理写入 Windows 注册表系统代理");
+envCmd.AddOption(eP); envCmd.AddOption(eH); envCmd.AddOption(eS);
+envCmd.AddOption(eN); envCmd.AddOption(eC); envCmd.AddOption(eV); envCmd.AddOption(eWR);
+envCmd.SetHandler(async (string? p, string? h, string? s, string? n, bool c, bool v, bool wr) =>
 {
-    cmd.AddOption(pName); cmd.AddOption(pSave);  cmd.AddOption(pLoad);
-    cmd.AddOption(pDelete); cmd.AddOption(pList); cmd.AddOption(pDefault);
-}
-
-Action<string?,bool,bool,bool,bool,bool> presetHandler =
-(name, save, load, delete, list, setDefault) =>
-{
-    if (list || (!save && !load && !delete && !setDefault && string.IsNullOrEmpty(name)))
+    if (wr) { WriteRegistry(); return; }
+    if (c) { EnvVarManager.SetProxyForCurrentProcess(new ProxyConfig()); ConsoleStyle.Success("全局代理已清除。"); return; }
+    var hv = p ?? h;
+    if (!string.IsNullOrEmpty(hv))
     {
-        ConsoleStyle.Title("已保存的预设 (Saved Presets)");
-        PrintPresetList();
-        return;
+        if (v) { var r = await ProxyTester.TestProxyAsync(hv); if (!r.Success) { ConsoleStyle.Error($"代理测试失败: {r.ErrorMessage}"); return; } }
+        EnvVarManager.SetProxyForCurrentProcess(new ProxyConfig { HttpProxy = hv, HttpsProxy = p ?? s ?? hv, NoProxy = n });
+        ConsoleStyle.Success($"全局代理已设置 -> {hv}"); return;
     }
-    if (string.IsNullOrEmpty(name)) { ConsoleStyle.Warning("请使用 --name/-n 指定预设名称。"); return; }
-    if (save)
-    {
-        var profile = new Profile { Name = name, EnvVars = EnvVarManager.GetProxyConfig(EnvLevel.User) };
-        foreach (var t in ToolRegistry.GetAllTools()) { var c = t.GetCurrentConfig(); if (c != null) profile.ToolConfigs[t.ToolName] = c; }
-        ProfileManager.Save(profile);
-        ConsoleStyle.Success($"预设 '{name}' 已保存。");
-        ConsoleStyle.Info($"  提示：使用 `gate apply {name}` 快速应用。");
-        return;
-    }
-    if (load)   { ApplyPreset(name); return; }
-    if (delete)
-    {
-        if (ProfileManager.Delete(name)) ConsoleStyle.Success($"预设 '{name}' 已删除。");
-        else ConsoleStyle.Error($"预设 '{name}' 不存在。");
-        return;
-    }
-    if (setDefault)
-    {
-        ProfileManager.SetDefaultProfile(name);
-        ConsoleStyle.Success($"默认预设已设置为: {name}");
-    }
-};
+    StatusPrinter.PrintProxyLayers();
+}, eP, eH, eS, eN, eC, eV, eWR);
+root.AddCommand(envCmd);
+root.AddCommand(new Command("global", "[旧]") { IsHidden = true });
 
-presetCommand.SetHandler( presetHandler, pName, pSave, pLoad, pDelete, pList, pDefault);
-profileCommand.SetHandler(presetHandler, pName, pSave, pLoad, pDelete, pList, pDefault);
-rootCommand.AddCommand(presetCommand);
-rootCommand.AddCommand(profileCommand);
+// ── gate preset ───────────────────────────────────────────────────────────────
+root.AddCommand(PresetCommands.Build());
+root.AddCommand(new Command("profile", "[旧]") { IsHidden = true });
+root.AddCommand(new Command("apply",   "[旧]") { IsHidden = true });
 
-// ── 4. info / status / show ───────────────────────────────────────────────────
-var infoCommand   = new Command("info",   "查看当前所有代理配置状态");
-var statusCommand = new Command("status", "查看代理状态 (别名: info)");
-var showCommand   = new Command("show",   "查看代理状态 (别名: info)");
-
-Action infoHandler = () =>
-{
-    ConsoleStyle.Title("全局代理 (Global Proxy / Env Vars)");
-    PrintProxyTable(EnvVarManager.GetProxyConfig(EnvLevel.User));
-
-    ConsoleStyle.Title("应用代理配置 (App Proxy Config)");
-    var anyTool = false;
-    foreach (var cat in ToolRegistry.GetCategories())
-    {
-        var catTools = ToolRegistry.GetByCategory(cat)
-            .Where(t => { var c = t.GetCurrentConfig(); return c != null && !c.IsEmpty; })
-            .ToList();
-        if (catTools.Count == 0) continue;
-        anyTool = true;
-        ConsoleStyle.Subtitle($"  [{cat}]");
-        foreach (var tool in catTools)
-        {
-            var inst = tool.IsInstalled() ? "[OK] " : "[?]  ";
-            Console.WriteLine($"    {inst} {tool.ToolName,-22}  {tool.GetCurrentConfig()}");
-        }
-    }
-    if (!anyTool) ConsoleStyle.Info("  暂无应用代理配置。");
-
-    ConsoleStyle.Title("预设 (Presets)");
-    PrintPresetList();
-};
-
-infoCommand.SetHandler(infoHandler);
-statusCommand.SetHandler(infoHandler);
-showCommand.SetHandler(infoHandler);
-rootCommand.AddCommand(infoCommand);
-rootCommand.AddCommand(statusCommand);
-rootCommand.AddCommand(showCommand);
-
-// ── 5. test / check ───────────────────────────────────────────────────────────
-var testCommand  = new Command("test",  "测试代理连通性");
-var checkCommand = new Command("check", "测试代理连通性 (别名: test)");
-
-var tProxy = new Option<string?>(new[]{"--proxy","-p"}, "代理地址（省略则使用环境变量）");
-var tUrl   = new Option<string?>("--url",                "测试目标 URL（默认: http://www.google.com）");
-
-foreach (var cmd in new Command[]{testCommand, checkCommand})
-    { cmd.AddOption(tProxy); cmd.AddOption(tUrl); }
-
-Func<string?,string?,Task> testHandler = async (proxy, url) =>
-{
-    if (string.IsNullOrEmpty(proxy))
-    {
-        var cur = EnvVarManager.GetProxyConfig(EnvLevel.User);
-        proxy = cur.HttpProxy ?? cur.HttpsProxy;
-        if (string.IsNullOrEmpty(proxy)) { ConsoleStyle.Error("未配置代理。使用 --proxy/-p 指定地址。"); return; }
-        ConsoleStyle.Info($"使用当前环境变量代理: {proxy}");
-    }
-    Console.Write("测试中");
-    using var timer = new System.Timers.Timer(400);
-    timer.Elapsed += (_, _) => Console.Write(".");
-    timer.Start();
-    var result = await ProxyTester.TestProxyAsync(proxy, url);
-    timer.Stop();
-    Console.WriteLine();
-    if (result.Success)
-        ConsoleStyle.Success($"连接成功！响应时间: {result.ResponseTimeMs}ms  目标: {result.TestUrl}");
-    else
-        ConsoleStyle.Error($"连接失败: {result.ErrorMessage}");
-};
-
-testCommand.SetHandler( testHandler, tProxy, tUrl);
-checkCommand.SetHandler(testHandler, tProxy, tUrl);
-rootCommand.AddCommand(testCommand);
-rootCommand.AddCommand(checkCommand);
-
-// ── 6. set ────────────────────────────────────────────────────────────────────
-var setCommand = new Command("set", "一站式快速配置：同时设置全局和应用代理");
-var sGlobal  = new Option<string?>(new[]{"--global","-g"}, "设置全局代理地址");
-var sApp     = new Option<string?>(new[]{"--app",   "-a"}, "应用名称，逗号分隔");
-var sProxy   = new Option<string?>(new[]{"--proxy", "-p"}, "代理地址（与 --app 配合）");
-var sVerify  = new Option<bool>(   new[]{"--verify","-v"}, "设置前测试代理");
-setCommand.AddOption(sGlobal); setCommand.AddOption(sApp);
-setCommand.AddOption(sProxy);  setCommand.AddOption(sVerify);
-setCommand.SetHandler(async (string? gp, string? appNames, string? ap, bool verify) =>
-{
-    var proxyAddr = gp ?? ap;
-    if (string.IsNullOrEmpty(proxyAddr))
-    {
-        ConsoleStyle.Warning("请使用 --global/-g 或 --proxy/-p 指定代理地址。"); return;
-    }
-    if (verify)
-    {
-        ConsoleStyle.Info($"正在测试 {proxyAddr}...");
-        var r = await ProxyTester.TestProxyAsync(proxyAddr);
-        if (!r.Success) { ConsoleStyle.Error($"代理测试失败: {r.ErrorMessage}"); return; }
-        ConsoleStyle.Success($"代理可用，响应时间: {r.ResponseTimeMs}ms");
-    }
-    if (!string.IsNullOrEmpty(gp))
-    {
-        EnvVarManager.SetProxyForCurrentProcess(new ProxyConfig { HttpProxy = gp, HttpsProxy = gp });
-        ConsoleStyle.Success($"全局代理已设置 -> {gp}");
-        ConsoleStyle.Info("  提示：使用 `gate app -n git,npm -p <地址>` 为应用单独配置。");
-    }
-    if (!string.IsNullOrEmpty(appNames))
-    {
-        var addr = ap ?? gp!;
-        foreach (var n in appNames.Split(",", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            var tool = ToolRegistry.GetByName(n);
-            if (tool == null)        { ConsoleStyle.Error($"{n}: 未找到"); continue; }
-            if (!tool.IsInstalled()) { ConsoleStyle.Warning($"{n}: 未安装，跳过"); continue; }
-            if (tool.SetProxy(addr)) ConsoleStyle.Success($"{n}: 代理已设置 -> {addr}");
-            else                     ConsoleStyle.Error($"{n}: 设置失败");
-        }
-    }
-}, sGlobal, sApp, sProxy, sVerify);
-rootCommand.AddCommand(setCommand);
-
-// ── 7. apply ──────────────────────────────────────────────────────────────────
-var applyCommand = new Command("apply", "直接应用指定预设");
-var applyArg     = new Argument<string>("name", "预设名称");
-applyCommand.AddArgument(applyArg);
-applyCommand.SetHandler((string name) => ApplyPreset(name), applyArg);
-rootCommand.AddCommand(applyCommand);
-
-// ── 8. list ───────────────────────────────────────────────────────────────────
-var listCommand = new Command("list", "列出资源：apps（应用）或 presets（预设，默认）");
-var listArg = new Argument<string?>("resource", () => null, "apps 或 presets（默认）");
-listCommand.AddArgument(listArg);
-listCommand.SetHandler((string? resource) =>
-{
-    if (resource?.Equals("apps", StringComparison.OrdinalIgnoreCase) == true)
-        PrintToolList();
-    else { ConsoleStyle.Title("已保存的预设 (Saved Presets)"); PrintPresetList(); }
-}, listArg);
-rootCommand.AddCommand(listCommand);
-
-// ── 9. path ─────────────────────────────────────────────────────────────────
-var pathCommand = new Command("path", "查看或设置工具的自定义路径（解决非标准安装路径问题）");
-var pathName   = new Option<string?>(new[]{"--name","-n"}, "工具名称");
-var pathExec   = new Option<string?>("--exec",  "可执行文件路径");
-var pathCfg    = new Option<string?>("--config","配置文件路径");
-var pathClear  = new Option<bool>(   "--clear", "清除自定义路径，恢复自动检测");
-var pathList   = new Option<bool>(   new[]{"--list","-l"}, "列出所有已自定义路径的工具");
-pathCommand.AddOption(pathName); pathCommand.AddOption(pathExec);
-pathCommand.AddOption(pathCfg);  pathCommand.AddOption(pathClear);
-pathCommand.AddOption(pathList);
-
-// Path config stored at: ~/.gate/tool_paths.json
-var toolPathFile = Path.Combine(
-    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-    ".gate", "tool_paths.json");
-
-pathCommand.SetHandler((string? name, string? exec, string? cfg, bool clear, bool list) =>
+// ── gate path ─────────────────────────────────────────────────────────────────
+var pathCmd    = new Command("path", "查看或设置工具的自定义可执行/配置文件路径");
+var pathN      = new Option<string?>(new[]{"-n","--name"}, "工具名称");
+var pathExec   = new Option<string?>("--exec",   "工具可执行文件路径");
+var pathConf   = new Option<string?>("--config", "工具配置文件路径");
+var pathClear  = new Option<bool>("--clear",  "清除自定义路径");
+var pathList   = new Option<bool>(new[]{"-l","--list"}, "列出所有自定义路径");
+pathCmd.AddOption(pathN); pathCmd.AddOption(pathExec); pathCmd.AddOption(pathConf);
+pathCmd.AddOption(pathClear); pathCmd.AddOption(pathList);
+pathCmd.SetHandler((string? name, string? exec, string? config, bool clear, bool list) =>
 {
     if (list)
     {
-        ConsoleStyle.Title("已自定义路径的工具");
-        if (!File.Exists(toolPathFile)) { ConsoleStyle.Info("  暂无自定义路径配置。"); return; }
-        var json = File.ReadAllText(toolPathFile);
-        Console.WriteLine(json);
+        var cp = ToolRegistry.GetCustomPaths();
+        if (cp.Count == 0) { ConsoleStyle.Info("暂无自定义路径配置。"); return; }
+        foreach (var kv in cp)
+            Console.WriteLine($"  {kv.Key,-22} exec={kv.Value.Exec ?? "(auto)"}  config={kv.Value.Config ?? "(auto)"}");
         return;
     }
-    if (string.IsNullOrEmpty(name)) { ConsoleStyle.Warning("请使用 --name/-n 指定工具名。"); return; }
-    var tool = ToolRegistry.GetByName(name);
-    if (tool == null) { ConsoleStyle.Error($"未找到工具: {name}"); return; }
-    if (clear)
+    if (string.IsNullOrEmpty(name)) { ConsoleStyle.Warning("请指定工具名：gate path -n <tool>"); return; }
+    if (clear) { ToolRegistry.ClearCustomPath(name); ConsoleStyle.Success($"{name}: 自定义路径已清除"); return; }
+    if (!string.IsNullOrEmpty(exec) || !string.IsNullOrEmpty(config))
     {
-        // Remove entry from JSON file
-        ConsoleStyle.Success($"{name}: 自定义路径已清除，恢复自动检测。");
+        ToolRegistry.SetCustomPath(name, exec, config); ConsoleStyle.Success($"{name}: 路径已更新");
+        if (!string.IsNullOrEmpty(exec))   ConsoleStyle.Info($"  exec  : {exec}");
+        if (!string.IsNullOrEmpty(config)) ConsoleStyle.Info($"  config: {config}");
         return;
     }
-    if (!string.IsNullOrEmpty(exec) || !string.IsNullOrEmpty(cfg))
-    {
-        Directory.CreateDirectory(Path.GetDirectoryName(toolPathFile)!);
-        ConsoleStyle.Success($"{name}: 路径已保存。");
-        if (!string.IsNullOrEmpty(exec)) ConsoleStyle.ListItem("  可执行文件", exec);
-        if (!string.IsNullOrEmpty(cfg))  ConsoleStyle.ListItem("  配置文件  ", cfg);
-        return;
-    }
-    // Show current
-    ConsoleStyle.Title($"{name} 路径配置");
-    ConsoleStyle.ListItem("  自动检测可执行", tool.IsInstalled() ? "[installed]" : "[not found]");
-    ConsoleStyle.Info("  使用 --exec <path> 或 --config <path> 设置自定义路径");
-}, pathName, pathExec, pathCfg, pathClear, pathList);
-rootCommand.AddCommand(pathCommand);
+    var info = ToolRegistry.GetCustomPath(name);
+    Console.WriteLine($"  {name}\n    exec  : {info?.Exec ?? "(auto)"}\n    config: {info?.Config ?? "(auto)"}");
+}, pathN, pathExec, pathConf, pathClear, pathList);
+root.AddCommand(pathCmd);
 
-// ── 10. wizard ─────────────────────────────────────────────────────────────────
-var wizardCommand = new Command("wizard", "交互式配置向导（新手推荐）");
-wizardCommand.SetHandler(async () =>
+// ── gate test ─────────────────────────────────────────────────────────────────
+var testCmd   = new Command("test", "测试代理连通性");
+var testProxy = new Argument<string?>("proxy", () => null);
+var testUrl   = new Option<string?>("--url", "自定义测试目标 URL");
+var testLegP  = new Option<string?>(new[]{"-p","--proxy"}, "[旧]") { IsHidden = true };
+var testComp  = new Option<string[]>("--compare", "对比多个代理") { AllowMultipleArgumentsPerToken = true };
+testCmd.AddArgument(testProxy); testCmd.AddOption(testUrl);
+testCmd.AddOption(testLegP); testCmd.AddOption(testComp);
+testCmd.SetHandler(async (string? p, string? url, string? legP, string[] compare) =>
 {
-    ConsoleStyle.Title("Gate 代理配置向导 (Setup Wizard)");
-    Console.WriteLine("  本向导将引导您完成代理配置。按 Enter 跳过可选步骤。");
-    Console.WriteLine();
-
-    // Step 1: Global proxy
-    ConsoleStyle.Subtitle("第 1/4 步  全局代理地址");
-    Console.Write("  输入代理地址（如 http://127.0.0.1:7890，Enter 跳过）：");
-    var proxyInput = Console.ReadLine()?.Trim();
-    ProxyConfig? globalCfg = null;
-    if (!string.IsNullOrEmpty(proxyInput))
+    var compareList = (compare ?? Array.Empty<string>())
+        .SelectMany(c => c.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)).ToList();
+    if (!string.IsNullOrEmpty(p)) compareList.Insert(0, p);
+    if (compareList.Count > 1)
     {
-        var v = ConfigValidator.ValidateProxyConfig(new ProxyConfig { HttpProxy = proxyInput });
-        if (!v.IsValid) { ConsoleStyle.Error($"地址无效: {v.ErrorMessage}"); }
-        else
-        {
-            Console.Write("  是否测试连通性？[Y/n] ");
-            var yn = Console.ReadLine()?.Trim().ToLower();
-            if (yn != "n")
-            {
-                ConsoleStyle.Info("测试中...");
-                var r = await ProxyTester.TestProxyAsync(proxyInput);
-                if (r.Success) ConsoleStyle.Success($"连接成功，响应时间: {r.ResponseTimeMs}ms");
-                else           ConsoleStyle.Warning($"测试失败: {r.ErrorMessage}（继续配置）");
-            }
-            globalCfg = new ProxyConfig { HttpProxy = proxyInput, HttpsProxy = proxyInput };
-            EnvVarManager.SetProxyForCurrentProcess(globalCfg);
-            ConsoleStyle.Success("全局代理已设置。");
-        }
+        ConsoleStyle.Title($"代理对比测试（{compareList.Count} 个代理）");
+        var results = new System.Collections.Generic.List<(string Proxy, ProxyTestResult Result)>();
+        foreach (var px in compareList)
+        { ConsoleStyle.Info($"  正在测试 {px}..."); results.Add((px, await ProxyTester.TestProxyAsync(px, url))); }
+        Console.WriteLine($"\n  {"代理地址",-42} {"状态",-8} {"延迟(ms)",10}\n  {new string('-', 64)}");
+        foreach (var (px, r) in results.OrderBy(x => x.Result.Success ? x.Result.ResponseTimeMs : int.MaxValue))
+            Console.WriteLine($"  {px,-42} {(r.Success ? "✓ 可用" : "✗ 不可用"),-8} {(r.Success ? r.ResponseTimeMs.ToString() : "-"),10}");
+        var best = results.Where(x => x.Result.Success).OrderBy(x => x.Result.ResponseTimeMs).FirstOrDefault();
+        Console.WriteLine();
+        if (best.Proxy != null) ConsoleStyle.Success($"最快可用代理: {best.Proxy} ({best.Result.ResponseTimeMs}ms)");
+        else ConsoleStyle.Error("所有代理均不可用"); return;
     }
+    var proxy = p ?? legP
+        ?? EnvVarManager.GetProxyConfig(EnvLevel.Process).HttpProxy
+        ?? EnvVarManager.GetProxyConfig(EnvLevel.User).HttpProxy;
+    if (string.IsNullOrEmpty(proxy)) { ConsoleStyle.Warning("未配置代理，请指定：gate test <proxy>"); return; }
+    ConsoleStyle.Info($"正在测试 {proxy}" + (url != null ? $" -> {url}" : "") + "...");
+    var res = await ProxyTester.TestProxyAsync(proxy, url);
+    if (res.Success) ConsoleStyle.Success($"代理可用，响应时间: {res.ResponseTimeMs}ms  目标: {res.TestUrl}");
+    else             ConsoleStyle.Error($"代理不可用: {res.ErrorMessage}  目标: {res.TestUrl}");
+}, testProxy, testUrl, testLegP, testComp);
+root.AddCommand(testCmd);
+root.AddCommand(new Command("check", "[旧]") { IsHidden = true });
 
-    // Step 2: App proxies
-    ConsoleStyle.Subtitle("第 2/4 步  配置应用代理");
-    var installedTools = ToolRegistry.GetInstalledTools();
-    Console.WriteLine($"  检测到 {installedTools.Count} 个已安装的应用。");
-    Console.Write("  要配置的应用名称（逗号分隔，Enter 跳过，all=全部）：");
-    var appInput = Console.ReadLine()?.Trim();
-    if (!string.IsNullOrEmpty(appInput) && !string.IsNullOrEmpty(proxyInput))
+// ── gate list ─────────────────────────────────────────────────────────────────
+var listCmd  = new Command("list", "列出工具或预设");
+var listRes  = new Argument<string?>("resource", () => null, "apps | presets");
+var listInst = new Option<bool>(new[]{"-i","--installed"});
+listCmd.AddArgument(listRes); listCmd.AddOption(listInst);
+listCmd.SetHandler((string? res, bool inst) =>
+{
+    switch (res?.ToLowerInvariant())
     {
-        var names = appInput.Equals("all", StringComparison.OrdinalIgnoreCase)
-            ? installedTools.Select(t => t.ToolName).ToArray()
-            : appInput.Split(",", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        foreach (var n in names)
-        {
-            var tool = ToolRegistry.GetByName(n);
-            if (tool == null || !tool.IsInstalled()) { ConsoleStyle.Warning($"{n}: 跳过"); continue; }
-            if (tool.SetProxy(proxyInput)) ConsoleStyle.Success($"{n}: 已配置");
-            else ConsoleStyle.Error($"{n}: 配置失败");
-        }
+        case "apps": case "app": case "tools": StatusPrinter.PrintToolList(inst); break;
+        case "presets": case "preset":         StatusPrinter.PrintPresetList();   break;
+        default: StatusPrinter.PrintToolSummary(); StatusPrinter.PrintPresetList(); break;
     }
+}, listRes, listInst);
+root.AddCommand(listCmd);
 
-    // Step 3: No-proxy
-    ConsoleStyle.Subtitle("第 3/4 步  NO_PROXY 排除列表");
-    Console.Write("  排除地址（Enter 使用默认 localhost,127.0.0.1,::1）：");
-    var noProxyInput = Console.ReadLine()?.Trim();
-    if (string.IsNullOrEmpty(noProxyInput)) noProxyInput = "localhost,127.0.0.1,::1";
-    if (globalCfg != null) { globalCfg.NoProxy = noProxyInput; EnvVarManager.SetProxyForCurrentProcess(globalCfg); }
-    ConsoleStyle.Success($"NO_PROXY 已设置: {noProxyInput}");
+// ── gate history ──────────────────────────────────────────────────────────────
+root.AddCommand(HistoryCommands.Build());
 
-    // Step 4: Save preset
-    ConsoleStyle.Subtitle("第 4/4 步  保存为预设（可选）");
-    Console.Write("  输入预设名称保存（Enter 跳过）：");
-    var presetName = Console.ReadLine()?.Trim();
-    if (!string.IsNullOrEmpty(presetName))
+// ── gate wizard ───────────────────────────────────────────────────────────────
+root.AddCommand(WizardCommand.Build());
+
+// ── gate doctor ───────────────────────────────────────────────────────────────
+root.AddCommand(DoctorCommand.Build());
+
+// ── gate info / status / show (aliases) ───────────────────────────────────────
+foreach (var alias in new[]{"info", "status", "show"})
+{
+    var c = new Command(alias, alias == "info" ? "查看当前所有代理配置状态总览" : $"[旧]") { IsHidden = alias != "info" };
+    c.SetHandler(StatusPrinter.PrintStatusOverview);
+    root.AddCommand(c);
+}
+
+// ── gate reset ────────────────────────────────────────────────────────────────
+var resetCmd   = new Command("reset", "完全重置：清除所有代理配置、预设和自定义路径");
+var resetForce = new Option<bool>(new[]{"--force","-f"}, "跳过确认");
+resetCmd.AddOption(resetForce);
+resetCmd.SetHandler((bool force) =>
+{
+    if (!force)
     {
-        var profile = new Profile { Name = presetName, EnvVars = globalCfg ?? new ProxyConfig() };
-        foreach (var t in ToolRegistry.GetAllTools()) { var c = t.GetCurrentConfig(); if (c != null) profile.ToolConfigs[t.ToolName] = c; }
-        ProfileManager.Save(profile);
-        ConsoleStyle.Success($"预设 '{presetName}' 已保存。");
+        Console.Write("  警告：此操作将清除所有代理配置、预设和自定义路径，无法撤销。确认? [y/N]: ");
+        if ((Console.ReadLine()?.Trim().ToLowerInvariant() ?? "") is not ("y" or "yes")) { ConsoleStyle.Info("已取消。"); return; }
     }
+    EnvVarManager.SetProxyForCurrentProcess(new ProxyConfig()); ConsoleStyle.Success("全局代理已清除");
+    var tc = 0; foreach (var t in ToolRegistry.GetAllTools()) if (t.IsInstalled() && t.ClearProxy()) tc++;
+    ConsoleStyle.Success($"{tc} 个工具代理已清除");
+    var ps = ProfileManager.List(); foreach (var p in ps) ProfileManager.Delete(p);
+    ConsoleStyle.Success($"{ps.Count} 个预设已删除");
+    var ck = ToolRegistry.GetCustomPaths().Keys.ToList(); foreach (var k in ck) ToolRegistry.ClearCustomPath(k);
+    ConsoleStyle.Success($"{ck.Count} 个自定义路径配置已清除");
+    ConsoleStyle.Info("Gate 已完全重置。运行 `gate wizard` 重新配置。");
+}, resetForce);
+root.AddCommand(resetCmd);
 
-    Console.WriteLine();
-    ConsoleStyle.Success("向导完成！运行 `gate info` 查看当前完整配置。");
-});
-rootCommand.AddCommand(wizardCommand);
+// ── gate plugin ───────────────────────────────────────────────────────────────
+root.AddCommand(PluginCommands.Build());
 
-// ── Entry point ───────────────────────────────────────────────────────────────
-await rootCommand.InvokeAsync(args); 
+// ── gate export-all / import-all ─────────────────────────────────────────────
+root.AddCommand(MigrationCommands.BuildExportAll());
+root.AddCommand(MigrationCommands.BuildImportAll());
+
+// ── gate completion ───────────────────────────────────────────────────────────
+root.AddCommand(CompletionCommand.Build());
+
+// ── gate install-shell-hook ───────────────────────────────────────────────────
+root.AddCommand(ShellHookCommand.Build());
+
+// ─────────────────────────────────────────────────────────────────────────────
+return await root.InvokeAsync(args);

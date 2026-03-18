@@ -1,0 +1,22 @@
+{
+  "toolName": "windsurf",
+  "displayName": "Windsurf",
+  "category": "AI IDE",
+  "executable": {
+    "windows": "windsurf.exe",
+    "linux":   "windsurf",
+    "macos":   "windsurf"
+  },
+  "config": {
+    "probePaths": [
+      {
+        "windows": "%APPDATA%\\Windsurf\\User\\settings.json",
+        "linux":   "~/.config/Windsurf/User/settings.json",
+        "macos":   "~/Library/Application Support/Windsurf/User/settings.json"
+      }
+    ],
+    "format": "json",
+    "jsonProxyPath": "http.proxy",
+    "jsonHttpsProxyPath": "http.proxy"
+  }
+}
