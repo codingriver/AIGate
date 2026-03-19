@@ -14,7 +14,7 @@
 | `gate clear [--all]` | 清除全局代理（含 ALL_PROXY）；`--all` 含插件工具（A12）；过期自动清除仅清全局代理并置 `proxyExpiresAt` 为 null（B7、B8） |
 | `gate env [--write-registry]` | 显示三层环境变量 |
 | `gate history [clear]` | 查看/清除历史记录；输出格式：表格（序号、地址、最后使用时间）；`--json` 时输出数组（B6） |
-| `gate install-shell-hook` | 安装 Shell 持久化钩子（动态读取模式，A2） |
+| `gate install-shell-hook` | 安装 Shell 持久化钩子（动态读取模式，A2）；**独立顶级命令，与 `gate wizard` 流程无关**（C2） |
 | `gate env --export-script <shell>` | 输出 shell 代理导出脚本；无代理时输出空脚本；有代理时输出三行 export 语句（B4） |
 
 ### 工具代理
@@ -110,16 +110,18 @@
 
 ## 5. `gate doctor` 诊断项
 
+> **C20 完整 8 项列表**：
+
 | # | 检查项 | 通过条件 |
 |---|--------|----------|
-| 1 | Gate 版本 | 已安装，版本字段可读 |
-| 2 | 全局代理状态 | 三层环境变量可读 |
-| 3 | Shell Hook | profile 文件含 Gate Hook |
-| 4 | 工具加载 | ToolRegistry 无加载错误 |
-| 5 | 插件格式 | 所有已安装插件 schema 合法 |
-| 6 | 数据目录权限 | `{DataDir}` 可读写 |
-| 7 | 默认预设 | 若配置了默认预设，文件存在 |
-| 8 | 连通性 | 当前代理可访问默认测试 URL |
+| 1 | 代理格式合法性 | 当前进程代理（若有）符合 `http(s)://host:port` 格式 |
+| 2 | 环境变量三层一致性 | Machine/User/Process 三层可读，无异常 |
+| 3 | Shell Hook 安装状态 | profile 文件含 Gate Hook 片段 |
+| 4 | 工具加载状态 | `ToolRegistry` 无加载错误，工具数 > 0 |
+| 5 | 插件格式合法性 | 所有已安装插件 schema 合法，无损坏 |
+| 6 | 数据目录权限 | `{DataDir}` 存在且可读写 |
+| 7 | 默认预设完整性 | 若配置了默认预设，对应 `profiles/{name}.json` 文件存在 |
+| 8 | 连通性 | 当前代理可访问 `GlobalConfig.DefaultTestUrl`（B28：无代理时显示 `⚠`，提示「当前未设置代理，跳过连通性检测」） |
 
 > **B28**：第 8 项无代理时显示 `⚠`，`checkDesc` 显示「当前未设置代理，跳过连通性检测」，不显示 `✗`。
 
@@ -188,6 +190,15 @@ gate config reset [<key>]      # 重置（单项或全部）
 | `defaultPreset` | string | `""` | 默认预设名 |
 | `pluginRegistryUrl` | string | `""` | 社区插件索引 URL |
 | `colorEnabled` | bool | `true` | 是否启用彩色输出 |
+
+### `gate pac` PAC 文件生成与托管（P1）
+
+```
+gate pac generate   # 生成 PAC 文件
+gate pac serve      # 托管 PAC 文件
+```
+
+> **C21**：PAC 文件规则来源：基于当前 `NO_PROXY` 列表生成直连规则，其余流量走当前全局代理；托管端口默认 8080，可通过 `--port` 指定。详细规范在 P1 需求文档中补充。
 
 ---
 

@@ -3,6 +3,8 @@
 > 所属项目：Gate · 模块化文档 v2.0 · 优先级：P0  
 > 关联文档：[CLI命令](./06-CLI命令-需求文档.md) | [数据模型](./07-数据模型-需求文档.md)
 
+> **C27 优先级术语说明**：P0 = 最高优先级，必须在首个正式版本中交付；与「已实现」的区别：「已实现」指代码已完成，「P0 规划」指代码尚未完成但首版必须交付。详见功能点列表文档头部术语说明。
+
 ---
 
 ## 1. 功能概述
@@ -177,6 +179,8 @@ public interface IMcpTransport {
 | `/sse` | GET | SSE 长连接，推送服务器事件 |
 | `/messages` | POST | 客户端发送 JSON-RPC 请求；`Content-Type` 必须为 `application/json`，否则返回 HTTP 400（B43） |
 | `/health` | GET | 健康检查，返回 `{"status":"ok"}` |
+
+> **C28 SSE 模式端点与 CORS 策略**：SSE 端点固定为 `/sse`，POST 端点固定为 `/messages`（与 MCP 规范一致）。CORS 策略：默认只允许 `localhost` 来源；如需扩展，可通过启动参数 `--cors-origin <origin>` 指定（如 `--cors-origin *` 允许所有来源，仅建议内网使用）。
 
 SSE 事件格式：
 ```
