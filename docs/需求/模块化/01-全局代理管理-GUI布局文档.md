@@ -67,7 +67,9 @@ GlobalPanel (VisualElement .global-panel)
 | `httpInput` | TextField | label: "HTTP 代理"；仅高级展开时可见 |
 | `httpsInput` | TextField | label: "HTTPS 代理"；仅高级展开时可见 |
 | `noProxyInput` | TextField | placeholder: `localhost,127.0.0.1,*.local`；仅高级展开时可见 |
-| `clearBtn` | Button | class: `btn-danger`；调用 `OnClearClicked` |
+| `clearBtn` | Button | class: `btn-danger`；调用 `OnClearClicked`，仅清全局代理（B7） |
+| `clearAllBtn` | Button | class: `btn-danger`；调用 `OnClearAllClicked`；弹确认对话框后执行 `gate clear --all`（B9）；标签文字「清除全部（含工具）」 |
+| `clearAllBtn` | Button | class: `btn-danger`；调用 `OnClearAllClicked`，弹确认对话框后执行 `gate clear --all`（B9） |
 | `applyBtn` | Button | class: `btn-primary`；输入为空或格式错误时禁用 |
 | `feedbackLabel` | Label | 默认 `display:none`；显示 3 秒后自动隐藏；成功绿/失败红/警告黄 |
 | `httpProxyLabel` | Label | 空值时显示 `(未设置)` 色 `#64748b`；有值时色 `#f59e0b` |
@@ -158,9 +160,30 @@ private async void OnClearClicked(ClickEvent evt) {
         _envVarManager.ClearProcess("HTTP_PROXY");
         _envVarManager.ClearProcess("HTTPS_PROXY");
         _envVarManager.ClearProcess("NO_PROXY");
+        _envVarManager.ClearProcess("ALL_PROXY");  // B5
     });
     Refresh();
     ShowFeedback("代理已清除", true);
+}
+
+// B9：清除全部（含工具代理）
+private async void OnClearAllClicked(ClickEvent evt) {
+    bool confirmed = await ConfirmDialog.Show(
+        "将清除全局代理及所有工具代理配置，确认继续？",
+        title: "清除全部代理",
+        confirm: "确认清除",
+        cancel: "取消");
+    if (!confirmed) return;
+    await Task.Run(() => {
+        _envVarManager.ClearProcess("HTTP_PROXY");
+        _envVarManager.ClearProcess("HTTPS_PROXY");
+        _envVarManager.ClearProcess("NO_PROXY");
+        _envVarManager.ClearProcess("ALL_PROXY");
+        foreach (var tool in _toolRegistry.GetAll())
+            if (tool.ReadProxy() != null) tool.ClearProxy();
+    });
+    Refresh();
+    ShowFeedback("全部代理已清除（含工具）", true);
 }
 ```
 

@@ -65,8 +65,8 @@ ToolsPanel (VisualElement .tools-panel)
 | `searchInput` | TextField | 实时过滤工具列表（debounce 200ms）；清空时恢复全部 |
 | `btnAll` / `btnInstalled` / `btnConfigured` | Button | 单选过滤；当前激活按钮加 `.active` 类；三者互斥 |
 | `batchProxyInput` | TextField | 批量操作代理地址；格式校验同全局代理规则 |
-| `batchApplyBtn` | Button | 对当前过滤结果中所有已安装工具执行批量设置 |
-| `batchClearBtn` | Button | 对当前过滤结果中所有已安装工具执行批量清除 |
+| `batchApplyBtn` | Button | 对**所有工具**（含未安装）执行批量设置，与 CLI `--all` 行为一致；未安装工具跳过并在状态栏汇报（B13） |
+| `batchClearBtn` | Button | 对**所有工具**（含未安装）执行批量清除，未安装工具跳过并在状态栏汇报（B13） |
 | `toolsScrollView` | ScrollView | 虚拟化滚动（仅渲染可见行），支持数百工具流畅滚动 |
 | `statusBadge` | Label | `已安装`（绿 `#22c55e`）/ `未安装`（灰 `#64748b`）/ `已配置`（黄 `#f59e0b`） |
 | `toolProxyInput` | TextField | 行内代理地址输入，placeholder 显示当前已配置值 |

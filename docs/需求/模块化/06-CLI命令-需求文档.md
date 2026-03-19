@@ -11,10 +11,11 @@
 | 命令 | 说明 |
 |------|------|
 | `gate set <proxy> [tools]` | 设置全局代理（同时写入 HTTP_PROXY、HTTPS_PROXY、ALL_PROXY） |
-| `gate clear [--all]` | 清除全局代理；`--all` 含插件工具（A12） |
+| `gate clear [--all]` | 清除全局代理（含 ALL_PROXY）；`--all` 含插件工具（A12）；过期自动清除仅清全局代理并置 `proxyExpiresAt` 为 null（B7、B8） |
 | `gate env [--write-registry]` | 显示三层环境变量 |
-| `gate history [clear]` | 查看/清除历史记录 |
+| `gate history [clear]` | 查看/清除历史记录；输出格式：表格（序号、地址、最后使用时间）；`--json` 时输出数组（B6） |
 | `gate install-shell-hook` | 安装 Shell 持久化钩子（动态读取模式，A2） |
+| `gate env --export-script <shell>` | 输出 shell 代理导出脚本；无代理时输出空脚本；有代理时输出三行 export 语句（B4） |
 
 ### 工具代理
 | 命令 | 说明 |
@@ -71,8 +72,8 @@
 
 | 标志 | 说明 |
 |------|------|
-| `--json` | 输出 JSON，不含 ANSI 转义码 |
-| `--quiet` / `-q` | 仅输出错误 |
+| `--json` | 输出 JSON，不含 ANSI 转义码；与 `--quiet` 同时使用时 `--json` 优先，仍输出完整 JSON（B32） |
+| `--quiet` / `-q` | 仅输出错误；若与 `--json` 同时使用，`--json` 优先（B32） |
 | `--no-color` | 禁用彩色（自动检测 `NO_COLOR` 环境变量） |
 | `--plain` | 纯文本，无表格框线 |
 | `--version` / `-v` | 显示版本后退出 |
@@ -120,6 +121,8 @@
 | 7 | 默认预设 | 若配置了默认预设，文件存在 |
 | 8 | 连通性 | 当前代理可访问默认测试 URL |
 
+> **B28**：第 8 项无代理时显示 `⚠`，`checkDesc` 显示「当前未设置代理，跳过连通性检测」，不显示 `✗`。
+
 输出示例：
 ```
 ✓ Gate 版本        v1.2.3
@@ -142,6 +145,14 @@
 3. 是否保存为预设？→ 输入预设名称
 4. 是否安装 Shell Hook？→ 选择 shell 类型
 5. 是否立即测试连通性？
+
+> **B27**：`gate wizard` 是交互式 CLI，需键盘输入。GUI 命令控制台为只读输出区，无法完成交互。GUI 里 `btnWizard` 应在系统终端中打开（`Process.Start("cmd.exe", "/k gate wizard")`），不在控制台面板内执行。
+
+> **B29**：`gate completion install` 只写 Tab 补全脚本；`gate install-shell-hook` 写代理动态加载钩子；两者功能独立，互不替代。
+
+> **B30**：`GateCliRunner.Run` 实现为启动 `gate.exe` 子进程（行为与用户在终端运行完全一致）；默认超时 30s。
+
+> **B31**：GUI 命令控制台的命令历史不持久化，每次打开 Editor 窗口重新清空。
 
 ---
 

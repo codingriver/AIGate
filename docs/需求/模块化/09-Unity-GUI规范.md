@@ -4,6 +4,12 @@
 > 技术栈：Unity UIToolkit（UXML + USS）  
 > 本文档是所有 GUI 布局文档的公共规范基础，优先级高于各模块 GUI 文档中的局部描述。
 
+> **B1 宿主说明**：Gate GUI 是 **Unity Editor 插件**，运行在 Unity Editor 进程内；开发者通过编辑器界面管理代理，为终端和子进程提效。
+
+> **B2 进程架构**：GUI 直接调用 Gate.Core 库（同进程）；`GlobalPanelController` 等控制器通过 `EnvVarManager`、`ToolRegistry` 等服务类操作，不经过 CLI 子进程。命令控制台面板通过 `GateCliRunner.Run` 启动子进程仅作为调试/演示入口，不作为功能主路径。
+
+> **B3 数据目录路径**：跨平台统一使用 `~/.local/share/gate`（XDG 规范）；macOS 上通过 `Environment.GetEnvironmentVariable("HOME")` 拼接，不使用 `LocalApplicationData`。
+
 ---
 
 ## 1. 窗口架构

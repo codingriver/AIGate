@@ -52,10 +52,14 @@ gate mcp --sse --port 3001 --host 0.0.0.0  # 允许远程连接
 }
 ```
 
+> **B41**：`configuredTools` 只返回 `ReadProxy() != null` 的工具，并使用内存缓存（工具代理写入/清除时更新），避免每次全量读取 214 个工具配置文件。
+
 ### set_tool_proxy
 **描述**：设置指定工具代理  
 **输入**：`tool`（必填）、`proxy`（设置时必填）、`clear`（bool，与 proxy 互斥）  
 **返回**：`{ success: bool, message: string }`
+
+> **B40**：`proxy` 与 `clear: true` 同时传入时，返回 JSON-RPC `-32602` 参数错误，`message` 为 `"proxy and clear are mutually exclusive"`。
 
 ### list_tools
 **描述**：列出所有支持的工具  
@@ -171,7 +175,7 @@ public interface IMcpTransport {
 | 端点 | 方法 | 说明 |
 |------|------|------|
 | `/sse` | GET | SSE 长连接，推送服务器事件 |
-| `/messages` | POST | 客户端发送 JSON-RPC 请求 |
+| `/messages` | POST | 客户端发送 JSON-RPC 请求；`Content-Type` 必须为 `application/json`，否则返回 HTTP 400（B43） |
 | `/health` | GET | 健康检查，返回 `{"status":"ok"}` |
 
 SSE 事件格式：
@@ -219,7 +223,7 @@ data: {"jsonrpc":"2.0","id":1,"result":{...}}
 
 ## 9. 日志与输出约束
 
-**stdio 模式输出约束**：`gate mcp` 运行期间，stdout 只输出 JSON-RPC 响应，所有日志写入 `{DataDir}/mcp.log`（A15：方案A）。
+**stdio 模式输出约束**：`gate mcp` 运行期间，stdout 只输出 JSON-RPC 响应，所有日志写入 `{DataDir}/mcp.log`（A15：方案A）。stdio 模式进程由 Cursor / Claude Desktop 等 AI 客户端通过 `mcp.json` 的 `command` 字段启动并管理；客户端退出时自动终止进程（B42）。
 
 ```csharp
 // Gate.Mcp/McpLogger.cs
@@ -236,7 +240,7 @@ public class McpLogger {
 - 日志格式：`[时间戳] [LEVEL] 消息`
 - 日志级别：`INFO`（工具调用记录）、`WARN`、`ERROR`
 - 不向 stderr 输出（客户端可能将 stderr 视为协议错误）
-- 日志轮转：超过 10MB 时重命名为 `mcp.log.1` 并创建新文件（保留最近 3 份）
+- 日志轮转：**每次写日志前检查文件大小**；超过 10MB 则先轮转再写入，当前行不丢失；轮转在同一写操作的锁内完成；保留最近 3 份（B44）
 
 ---
 
